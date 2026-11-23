@@ -104,7 +104,7 @@ Alurnya:
 | Mode update | Tanya dulu |
 | Tahap 1 | Cara A (fasad); catatan hanya di folder atlas-os; commit per langkah, push di akhir |
 | Penamaan | Nama file & isi kode baru dalam bahasa Inggris |
-| Repo Atlas OS | `SiJao/Atlas-OS`, dijadikan **private** |
+| Repo Atlas OS | `SiJao/Atlas-OS`, **publik** |
 
 ## 7. Tahapan
 
@@ -136,7 +136,7 @@ Alurnya:
 
 | Apa | Di mana |
 |---|---|
-| Repo proyek ini | `SiJao/Atlas-OS` (private) |
+| Repo proyek ini | `SiJao/Atlas-OS` (publik) |
 | Desain lengkap | `C:\HISADA\atlas-os\DESIGN.md` |
 | Rangkuman ini | `C:\HISADA\atlas-os\SUMMARY.md` |
 | Perlengkapan & hasil Tahap 0 | `C:\HISADA\atlas-os\stage0\` (STEPS.md, test.sh, voice-test.html, test-server.mjs, stage0-result.txt) |

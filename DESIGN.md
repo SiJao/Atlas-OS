@@ -7,7 +7,7 @@
 - **Tahap 1 SELESAI** (§16): lapisan OS `server/os/` di repo Atlas, 6 commit, sudah di-push.
 - Berikutnya: Tahap 2 (adaptor Linux) atau Tahap 3 (tampilan layar penuh).
 **Folder:** `C:\HISADA\atlas-os`. Proyek TERPISAH dari `C:\HISADA\atlas` dan tidak ikut repo `SiJao/atlas`.
-**Repo:** `SiJao/Atlas-OS` (private, sejak 2026-11-23). Unduhan besar di `stage0/downloads/` tidak ikut repo.
+**Repo:** `SiJao/Atlas-OS` (**publik**, keputusan Hong Khai 2026-11-23). Unduhan besar di `stage0/downloads/` tidak ikut repo.
 **Hubungan:** Atlas yang sekarang dijelaskan di [../atlas/DESIGN.md](../atlas/DESIGN.md) dan [../atlas/SPEC.md](../atlas/SPEC.md). Dokumen ini hanya membahas cara Atlas berjalan sebagai "sistem operasi" di laptop kedua.
 
 ---
