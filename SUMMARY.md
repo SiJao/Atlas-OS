@@ -17,7 +17,7 @@ Laptop kedua yang saat dinyalakan **langsung masuk ke Atlas**, layar penuh. Tida
 | Dasar sistem | Debian 13 minimal + X11 + Openbox |
 | Tampilan | Google Chrome layar penuh (kiosk) yang menampilkan Atlas |
 | Otak | tetap di awan: Gemini (depan) + Claude Code (belakang); data tetap di laptop |
-| Status | Tahap 0 lulus, Tahap 1–2 selesai; Tahap 3–6 belum |
+| Status | Tahap 0 lulus, Tahap 1–3 selesai; Tahap 4–6 belum |
 
 ## 2. Rancangan sistem
 
@@ -113,7 +113,7 @@ Alurnya:
 | 0 | Uji kelayakan: suara id-ID di Chrome Linux, RAM | ✅ **Lulus** di VirtualBox |
 | 1 | Pisah inti & lapisan OS di repo Atlas | ✅ **Selesai**: 6 commit, di-push |
 | 2 | Adaptor Linux `server/os/linux.js` | ✅ **Selesai**: 3 commit, uji VM 18/18 |
-| 3 | Tampilan layar penuh (prototipe Chrome → dipilih) | belum |
+| 3 | Tampilan layar penuh (prototipe Chrome → dipilih) | ✅ **Selesai**: tata letak A "Pusat", mode kiosk `/?kiosk=1`, 3 commit |
 | 4 | Skrip pemasang Debian → Atlas OS, ukur RAM asli | belum |
 | 5 | Alur update + rollback | belum |
 | 6 | Pengamanan & uji pakai harian | belum |
@@ -130,7 +130,8 @@ Alurnya:
 2. **Membaca isi aplikasi** di Linux (AT-SPI) lebih lemah daripada UI Automation di Windows.
 3. **Dua OS** harus dirawat dan diuji terus.
 4. **Belum terpasang:** jendela native (`pembantu.exe`) belum punya padanan Linux. Ini pekerjaan terbesar Tahap 2.
-5. **Tampilan layar penuh** belum dirancang (§8 DESIGN).
+5. **Layar utama** sudah jadi (tata letak A, §18 DESIGN), tetapi mikrofon & suara keluar belum diuji bersama layar ini di laptop asli.
+6. **Chrome kiosk ± 500–600 MB** di VM tanpa GPU. Di laptop asli (Intel UHD 600) diharapkan lebih kecil; diukur di Tahap 4.
 
 ## 9. Lokasi file
 
@@ -143,5 +144,6 @@ Alurnya:
 | Unduhan (ISO Debian, Rufus, pemasang VirtualBox) | `C:\HISADA\atlas-os\stage0\downloads\` (lokal saja, tidak ikut repo) |
 | Mesin virtual uji | VirtualBox → **AtlasOS-Test** (live, Tahap 0) dan **AtlasOS-Disk** (Debian terpasang, Tahap 2–4; kunci SSH di `C:\HISADA\atlas-os\vm\`, tidak ikut repo) |
 | Skrip uji Tahap 2 | `C:\HISADA\atlas-os\stage2\` (provision-vm.sh, smoke-test.sh, real-check.mjs, atspi-diag.sh) |
+| Prototipe & uji Tahap 3 | `C:\HISADA\atlas-os\stage3\` (home-prototype.html, kiosk-check.sh, shots\) |
 | Lapisan OS (kode) | `C:\HISADA\atlas\server\os\` (repo `SiJao/atlas`) |
 | Tes pagar | `C:\HISADA\atlas\tests\os-boundary.test.mjs` |

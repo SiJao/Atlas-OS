@@ -1,12 +1,13 @@
 # Atlas OS — Dokumen Desain
 
-**Versi:** 0.5
-**Tanggal:** 2026-11-23
+**Versi:** 0.6
+**Tanggal:** 2026-11-24
 **Status:**
 - **Tahap 0 LULUS** di VirtualBox (§15): pengenalan suara Bahasa Indonesia jalan di Google Chrome Linux.
 - **Tahap 1 SELESAI** (§16): lapisan OS `server/os/` di repo Atlas, 6 commit, sudah di-push.
 - **Tahap 2 SELESAI** (§17): adaptor Linux + pengganti pembantu.exe; 276 tes Windows lulus, uji asap VM 18/18.
-- Berikutnya: Tahap 3 (tampilan layar penuh).
+- **Tahap 3 SELESAI** (§18): layar utama tata letak A (dipilih Hong Khai) sebagai mode kiosk `/?kiosk=1`; 281 tes Windows lulus, diuji dengan Chrome `--kiosk` di VM.
+- Berikutnya: Tahap 4 (skrip pemasang Debian → Atlas OS, ukur RAM asli).
 **Folder:** `C:\HISADA\atlas-os`. Proyek TERPISAH dari `C:\HISADA\atlas` dan tidak ikut repo `SiJao/atlas`.
 **Repo:** `SiJao/Atlas-OS` (**publik**, keputusan Hong Khai 2026-11-23). Unduhan besar di `stage0/downloads/` tidak ikut repo.
 **Hubungan:** Atlas yang sekarang dijelaskan di [../atlas/DESIGN.md](../atlas/DESIGN.md) dan [../atlas/SPEC.md](../atlas/SPEC.md). Dokumen ini hanya membahas cara Atlas berjalan sebagai "sistem operasi" di laptop kedua.
@@ -468,3 +469,54 @@ Tujuannya: kode Windows baru tidak bisa diam-diam masuk lagi ke inti. Saat perta
 - tombol darurat dengan mouse/keyboard *fisik* (Xvfb tidak punya perangkat fisik; logika pemilahan XTEST sudah teruji di tes unit);
 - kecerahan sungguhan;
 - suara keluar ke speaker asli.
+
+## 18. Tahap 3 — layar utama layar penuh
+
+### 18.1 Prototipe & pilihan (2026-11-23)
+
+Prototipe: `stage3/home-prototype.html`. Tiga tata letak dengan orb asli Atlas (`web/orb.js`), dirancang untuk layar 1920×1080. Tangkapan layarnya ada di `stage3/shots/`.
+
+| Tata letak | Isi |
+|---|---|
+| **A · Pusat — DIPILIH Hong Khai** | Orb besar di tengah; jam + tanggal kiri atas; status (online, baterai, RAM) + tombol daya kanan atas; kartu "Hari ini" (pengingat/acara) di kiri; percakapan di kanan; dok 8 aplikasi izin di bawah |
+| B · Panel | kolom info di kiri; orb, percakapan, dan kolom ketik di kanan |
+| C · Tenang | hanya orb, jam, satu baris status; aplikasi di laci bawah |
+
+Keadaan orb yang sudah ada dipakai apa adanya:
+- diam;
+- mendengar (cincin mengikuti suara);
+- berpikir (emas cepat);
+- Claude bekerja (ungu);
+- berbicara;
+- kendali (merah).
+
+### 18.2 Rencana pemasangan (disetujui 2026-11-23: mode kiosk di halaman lama + kolom ketik di bawah percakapan)
+
+- **Mode kiosk di halaman Atlas yang sudah ada** (`web/index.html` + `app.js` + `gaya.css`), bukan halaman baru. Aktif bila alamatnya `/?kiosk=1`; `openChromeApp` di Linux memakai alamat itu saat `ATLAS_KIOSK=1`. Semua logika lama (mikrofon, suara, kartu izin, SSE, percakapan, orb) dipakai ulang. **Tampilan Windows (notch) tidak berubah.**
+- Isi layar diambil dari API yang sudah ada:
+  - jam: lokal;
+  - "Hari ini": `/api/pengingat` + `/api/acara`;
+  - status: `/api/laptop` + SSE `sumberdaya`;
+  - percakapan: SSE `pesan`.
+- **Dok aplikasi:** satu klik mengirim "buka <aplikasi>" lewat router lokal (tanpa Gemini, tanpa kuota). Daftar dok = daftar aplikasi izin Linux (§9).
+- **Menu daya:** tidurkan / mulai ulang / matikan (60 dtk, bisa dibatalkan) / batal, lewat alat `daya_pc` yang sudah ada.
+- **Kolom ketik:** di bagian bawah kartu percakapan kanan (disetujui), karena keyboard adalah jalan masuk kedua selain suara.
+- **Tes:** tes baru memastikan `?kiosk=1` memuat tata letak A dan halaman biasa tidak berubah. Uji di VM AtlasOS-Disk dengan Chrome `--kiosk` sungguhan, ditambah tangkapan layar.
+
+### 18.3 Hasil (selesai 2026-11-24)
+
+- **3 commit** di `SiJao/atlas` (`3070c20` → `3995c4b`), sudah di-push dan dicek lewat GitHub API:
+  1. router lokal untuk dok & menu daya, `/api/laptop` membawa data baterai;
+  2. mode kiosk `/?kiosk=1` dengan tata letak A di `web/` (index.html, gaya.css, app.js);
+  3. Chrome kiosk Linux membuka `/?kiosk=1`, boleh bersuara tanpa klik, tanpa pop-up Translate.
+- **Tes Windows:** 281/281 lulus (5 tes baru `kiosk.test.mjs`). Tanpa `?kiosk=1`, tampilan notch Windows tidak berubah.
+- **Uji di VM** (`stage3/kiosk-check.sh`: server Atlas + Chrome `--kiosk` sungguhan di layar X, tangkapan layar `stage3/shots/vm-kiosk.png`):
+  - jam, tanggal, "Hari ini" (2 pengingat yang dibuat lewat API), Online, baterai ⚡ 100 %, RAM, orb, status, percakapan, kolom ketik, dok 8 aplikasi: **semua tampil**;
+  - tombol dok "Lembar kerja" → router lokal → LibreOffice Calc terbuka, Atlas menjawab "Lembar kerja dibuka." **tanpa Gemini**;
+  - Chrome kiosk ± **587 MB** (PSS, VM tanpa GPU), sesuai temuan Tahap 0. RAM VM total terpakai ± 860 MB–1,2 GB.
+- **Diperbaiki dari uji:** pop-up Google Translate (kini `--disable-features=Translate` + meta `notranslate`), teks peringatan kunci yang menyebut path Windows, label dok terpotong (font Linux lebih lebar).
+
+**Belum (Tahap 4 ke atas):**
+- menu daya baru teruji lewat router, belum diklik sungguhan di laptop asli;
+- kalender Google belum muncul di "Hari ini" (menunggu akun Google pulih);
+- suara keluar dan mikrofon di kiosk baru teruji di Tahap 0, belum bersama layar ini.

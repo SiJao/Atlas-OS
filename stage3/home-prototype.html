@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Atlas OS — Layar Utama</title>
+<!--
+  Atlas OS stage 3 prototype (DESIGN §8 / §18): the full-screen home screen, three layouts to choose from.
+  Uses Atlas's real orb (../../atlas/web/orb.js), so open it from C:\HISADA\atlas-os\stage3\ with the Atlas folder beside it.
+  Designed for the Zyrex 11.6" FHD screen (1920×1080); scales to any window.
+  Keys: 1/2/3 = layout · Q/W/E/R/T = state (diam, dengar, pikir, Claude, bicara) · P = daya · A = laci aplikasi (layout C)
+-->
+<style>
+  :root {
+    --dasar: #0B1220; --permukaan: #111A2B; --permukaan-2: #16223A; --garis: #22314D;
+    --teks: #E6EDF7; --redup: #9AA8BF; --aksen: #38BDF8; --aksen-muda: #7DD3FC;
+    --awas: #F59E0B; --ungu: #C4B5FD; --merah: #FCA5A5; --hijau: #86EFAC;
+    --r: 18px;
+    font-family: "Segoe UI", "Inter", "DejaVu Sans", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #05080F; color: var(--teks); overflow: hidden; }
+  /* 1920×1080 stage scaled to the window, like the kiosk screen */
+  #panggung { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: 0 0;
+    background: radial-gradient(1200px 800px at 50% 45%, #0F1B33 0%, var(--dasar) 55%, #070B14 100%); overflow: hidden; }
+  .kartu { background: color-mix(in srgb, var(--permukaan) 88%, transparent); border: 1px solid var(--garis); border-radius: var(--r); }
+  .label { font-size: 15px; letter-spacing: .12em; text-transform: uppercase; color: var(--redup); }
+  .redup { color: var(--redup); }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+
+  /* ---------- shared pieces ---------- */
+  .jam { font-size: 120px; font-weight: 300; letter-spacing: -.02em; line-height: 1; font-variant-numeric: tabular-nums; }
+  .tanggal { font-size: 28px; color: var(--redup); margin-top: 10px; }
+  .orb-wadah { position: absolute; }
+  .orb-wadah canvas { width: 100%; height: 100%; display: block; }
+  .status { font-size: 30px; text-align: center; color: var(--aksen-muda); min-height: 40px; }
+  .status small { display: block; font-size: 20px; color: var(--redup); margin-top: 6px; }
+  .daftar-pengingat { list-style: none; margin: 14px 0 0; padding: 0; }
+  .daftar-pengingat li { display: flex; gap: 16px; padding: 12px 0; border-top: 1px solid var(--garis); font-size: 22px; }
+  .daftar-pengingat li:first-child { border-top: 0; }
+  .daftar-pengingat b { color: var(--aksen-muda); font-weight: 600; min-width: 70px; font-variant-numeric: tabular-nums; }
+  .statusbar { display: flex; gap: 26px; font-size: 20px; color: var(--redup); align-items: center; }
+  .statusbar span { display: inline-flex; gap: 8px; align-items: center; }
+  .titik { width: 10px; height: 10px; border-radius: 50%; background: var(--hijau); display: inline-block; }
+  .percakapan { display: flex; flex-direction: column; gap: 14px; font-size: 23px; line-height: 1.45; }
+  .ucap { max-width: 85%; padding: 14px 18px; border-radius: 16px; }
+  .ucap.saya { align-self: flex-end; background: #1E3A5F; border-bottom-right-radius: 4px; }
+  .ucap.atlas { align-self: flex-start; background: var(--permukaan-2); border: 1px solid var(--garis); border-bottom-left-radius: 4px; }
+  .dok { display: flex; gap: 14px; }
+  .app { width: 118px; height: 118px; border-radius: 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    background: var(--permukaan-2); border: 1px solid var(--garis); font-size: 16px; color: var(--teks); transition: transform .15s, border-color .15s; }
+  .app:hover { transform: translateY(-4px); border-color: var(--aksen); }
+  .app svg { width: 44px; height: 44px; stroke: var(--aksen-muda); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .tombol-daya { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--garis); background: var(--permukaan); }
+  .tombol-daya svg { width: 30px; height: 30px; stroke: var(--redup); fill: none; stroke-width: 2; stroke-linecap: round; }
+  .tombol-daya:hover svg { stroke: var(--merah); }
+  .ketik { display: flex; align-items: center; gap: 14px; padding: 16px 22px; border-radius: 999px; font-size: 22px; color: var(--redup); }
+  .ketik kbd { margin-left: auto; font-size: 16px; padding: 4px 10px; border: 1px solid var(--garis); border-radius: 8px; color: var(--redup); font-family: inherit; }
+
+  /* ---------- layouts ---------- */
+  .tata { position: absolute; inset: 0; display: none; }
+  #panggung[data-tata="A"] .tata-A, #panggung[data-tata="B"] .tata-B, #panggung[data-tata="C"] .tata-C { display: block; }
+
+  /* A: Pusat — orb in the middle, info cards around it, dock at the bottom */
+  .tata-A .kiri-atas { position: absolute; left: 80px; top: 70px; }
+  .tata-A .kanan-atas { position: absolute; right: 80px; top: 80px; display: flex; gap: 24px; align-items: center; }
+  .tata-A .orb-wadah { left: 660px; top: 150px; width: 600px; height: 600px; }
+  .tata-A .status { position: absolute; left: 460px; width: 1000px; top: 745px; }
+  .tata-A .k-pengingat { position: absolute; left: 80px; top: 330px; width: 470px; padding: 26px 30px; }
+  .tata-A .k-cakap { position: absolute; right: 80px; top: 230px; width: 520px; height: 540px; padding: 26px 30px; display: flex; flex-direction: column; justify-content: flex-end; }
+  .tata-A .dok-wadah { position: absolute; left: 50%; transform: translateX(-50%); bottom: 60px; padding: 16px; }
+
+  /* B: Panel — information column on the left, Atlas and the conversation on the right */
+  .tata-B .kolom { position: absolute; left: 0; top: 0; bottom: 0; width: 600px; padding: 70px 60px; background: color-mix(in srgb, var(--permukaan) 70%, transparent); border-right: 1px solid var(--garis); display: flex; flex-direction: column; gap: 36px; }
+  .tata-B .kolom .jam { font-size: 104px; }
+  .tata-B .dok { flex-wrap: wrap; }
+  .tata-B .dok .app { width: 148px; height: 112px; }
+  .tata-B .orb-wadah { left: 1000px; top: 40px; width: 520px; height: 520px; }
+  .tata-B .status { position: absolute; left: 760px; width: 1000px; top: 560px; }
+  .tata-B .k-cakap { position: absolute; left: 700px; right: 70px; top: 650px; bottom: 150px; padding: 22px 30px; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
+  .tata-B .ketik { position: absolute; left: 700px; right: 70px; bottom: 60px; }
+  .tata-B .daya-B { margin-top: auto; display: flex; gap: 18px; align-items: center; }
+
+  /* C: Tenang — only the orb, the time and one line; apps in a drawer from the bottom edge */
+  .tata-C .orb-wadah { left: 660px; top: 150px; width: 600px; height: 600px; }
+  .tata-C .jam-C { position: absolute; left: 0; right: 0; top: 60px; text-align: center; }
+  .tata-C .jam-C .jam { font-size: 64px; font-weight: 400; }
+  .tata-C .jam-C .tanggal { font-size: 22px; margin-top: 6px; }
+  .tata-C .status { position: absolute; left: 360px; width: 1200px; top: 870px; }
+  .tata-C .berikut { position: absolute; left: 0; right: 0; top: 950px; text-align: center; font-size: 22px; color: var(--redup); }
+  .tata-C .pojok { position: absolute; right: 60px; top: 60px; }
+  .tata-C .statusbar { position: absolute; left: 60px; top: 74px; }
+  .tata-C .tarik { position: absolute; left: 50%; transform: translateX(-50%); bottom: 18px; width: 120px; height: 6px; border-radius: 3px; background: var(--garis); }
+  .tata-C .laci { position: absolute; left: 0; right: 0; bottom: 0; height: 300px; transform: translateY(100%); transition: transform .35s ease;
+    background: color-mix(in srgb, var(--permukaan) 96%, transparent); border-top: 1px solid var(--garis); display: grid; place-items: center; }
+  .tata-C .laci.buka { transform: none; }
+  .tata-C .teks-C { position: absolute; left: 360px; width: 1200px; top: 765px; text-align: center; font-size: 26px; line-height: 1.5; color: var(--teks); opacity: 0; transition: opacity .3s; }
+  .tata-C .teks-C.ada { opacity: 1; }
+
+  /* ---------- power menu (shared) ---------- */
+  #daya { position: absolute; inset: 0; background: rgba(3, 6, 12, .78); display: none; place-items: center; z-index: 5; }
+  #daya.buka { display: grid; }
+  #daya .isi { display: flex; gap: 28px; }
+  #daya button { width: 190px; height: 170px; border-radius: 24px; display: flex; flex-direction: column; gap: 14px; align-items: center; justify-content: center; font-size: 22px; }
+  #daya svg { width: 52px; height: 52px; stroke: var(--teks); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  #daya .bahaya:hover { border-color: var(--merah); }
+  #daya p { text-align: center; color: var(--redup); font-size: 20px; margin-top: 26px; }
+
+  /* ---------- review bar (prototype only, outside the 1920×1080 stage) ---------- */
+  #pilih { position: fixed; left: 12px; bottom: 12px; display: flex; gap: 6px; flex-wrap: wrap; z-index: 10; font-size: 13px; }
+  #pilih button { padding: 7px 12px; border-radius: 8px; background: #111A2BEE; border: 1px solid #22314D; color: #9AA8BF; }
+  #pilih button.aktif { color: #E6EDF7; border-color: #38BDF8; }
+  #pilih .pisah { width: 10px; }
+</style>
+</head>
+<body>
+<div id="panggung" data-tata="A">
+
+  <!-- ===================== A: Pusat ===================== -->
+  <section class="tata tata-A">
+    <div class="kiri-atas"><div class="jam" data-jam>07:42</div><div class="tanggal" data-tanggal>Senin, 23 November 2026</div></div>
+    <div class="kanan-atas">
+      <div class="statusbar" data-statusbar></div>
+      <button class="tombol-daya" data-daya title="Daya"><svg viewBox="0 0 24 24"><path d="M12 3v8M6.6 6.6a8 8 0 1 0 10.8 0"/></svg></button>
+    </div>
+    <div class="kartu k-pengingat">
+      <div class="label">Hari ini</div>
+      <ul class="daftar-pengingat" data-pengingat></ul>
+    </div>
+    <div class="orb-wadah" data-orb></div>
+    <div class="status" data-status></div>
+    <div class="kartu k-cakap"><div class="percakapan" data-cakap></div></div>
+    <div class="kartu dok-wadah"><div class="dok" data-dok></div></div>
+  </section>
+
+  <!-- ===================== B: Panel ===================== -->
+  <section class="tata tata-B">
+    <div class="kolom">
+      <div><div class="jam" data-jam>07:42</div><div class="tanggal" data-tanggal>Senin, 23 November 2026</div></div>
+      <div><div class="label">Hari ini</div><ul class="daftar-pengingat" data-pengingat></ul></div>
+      <div><div class="label" style="margin-bottom:14px">Aplikasi</div><div class="dok" data-dok></div></div>
+      <div class="daya-B"><div class="statusbar" data-statusbar></div><span style="flex:1"></span>
+        <button class="tombol-daya" data-daya title="Daya"><svg viewBox="0 0 24 24"><path d="M12 3v8M6.6 6.6a8 8 0 1 0 10.8 0"/></svg></button></div>
+    </div>
+    <div class="orb-wadah" data-orb></div>
+    <div class="status" data-status></div>
+    <div class="kartu k-cakap"><div class="percakapan" data-cakap></div></div>
+    <div class="kartu ketik"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+      Ucapkan "Atlas, …" atau ketik di sini<kbd>Ctrl + Alt + Spasi</kbd></div>
+  </section>
+
+  <!-- ===================== C: Tenang ===================== -->
+  <section class="tata tata-C">
+    <div class="statusbar" data-statusbar></div>
+    <div class="jam-C"><div class="jam" data-jam>07:42</div><div class="tanggal" data-tanggal>Senin, 23 November 2026</div></div>
+    <div class="pojok"><button class="tombol-daya" data-daya title="Daya"><svg viewBox="0 0 24 24"><path d="M12 3v8M6.6 6.6a8 8 0 1 0 10.8 0"/></svg></button></div>
+    <div class="orb-wadah" data-orb></div>
+    <div class="teks-C" data-teks-c></div>
+    <div class="status" data-status></div>
+    <div class="berikut" data-berikut></div>
+    <button class="tarik" data-laci title="Aplikasi (A)"></button>
+    <div class="laci" data-laci-isi><div class="dok" data-dok></div></div>
+  </section>
+
+  <!-- ===================== power menu ===================== -->
+  <div id="daya">
+    <div>
+      <div class="isi">
+        <button class="kartu" data-tutup-daya><svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>Tidurkan</button>
+        <button class="kartu bahaya" data-tutup-daya><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></svg>Mulai ulang</button>
+        <button class="kartu bahaya" data-tutup-daya><svg viewBox="0 0 24 24"><path d="M12 3v8M6.6 6.6a8 8 0 1 0 10.8 0"/></svg>Matikan</button>
+        <button class="kartu" data-tutup-daya><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>Batal</button>
+      </div>
+      <p>Mulai ulang &amp; matikan menunggu 60 detik — bisa dibatalkan dengan "Atlas, batalkan".</p>
+    </div>
+  </div>
+</div>
+
+<div id="pilih">
+  <button data-pilih-tata="A">A · Pusat</button><button data-pilih-tata="B">B · Panel</button><button data-pilih-tata="C">C · Tenang</button>
+  <span class="pisah"></span>
+  <button data-keadaan="diam">Diam</button><button data-keadaan="dengar">Mendengar</button><button data-keadaan="pikir">Berpikir</button>
+  <button data-keadaan="claude">Claude bekerja</button><button data-keadaan="bicara">Berbicara</button>
+</div>
+
+<script src="../../atlas/web/orb.js"></script>
+<script>
+'use strict';
+const $$ = (s) => [...document.querySelectorAll(s)];
+const panggung = document.getElementById('panggung');
+
+// ---------- scale the 1920×1080 stage to the window ----------
+function skala() {
+  const k = Math.min(innerWidth / 1920, innerHeight / 1080);
+  panggung.style.transform = `scale(${k}) translate(-50%, -50%)`;
+  panggung.style.transformOrigin = '0 0';
+  panggung.style.left = `${innerWidth / 2}px`; panggung.style.top = `${innerHeight / 2}px`;
+  panggung.style.transform = `translate(-50%, -50%) scale(${k})`;
+  panggung.style.transformOrigin = 'center';
+}
+addEventListener('resize', skala); skala();
+
+// ---------- clock ----------
+const HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+const BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+function jam() {
+  const d = new Date();
+  const j = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  for (const e of $$('[data-jam]')) e.textContent = j;
+  for (const e of $$('[data-tanggal]')) e.textContent = `${HARI[d.getDay()]}, ${d.getDate()} ${BULAN[d.getMonth()]} ${d.getFullYear()}`;
+}
+jam(); setInterval(jam, 10000);
+
+// ---------- sample content (the real page gets this from Atlas's server) ----------
+const PENGINGAT = [['08:00', 'Rapat guru di aula'], ['10:30', 'Kirim laporan ke Pak Budi'], ['13:00', 'Setor hafalan santri kelas 2'], ['19:30', 'Cek proyek Atlas OS']];
+for (const ul of $$('[data-pengingat]')) ul.innerHTML = PENGINGAT.map(([w, t]) => `<li><b>${w}</b><span>${t}</span></li>`).join('');
+for (const e of $$('[data-berikut]')) e.innerHTML = `Berikutnya <b style="color:var(--aksen-muda)">08:00</b> · Rapat guru di aula`;
+
+const IKON = {
+  web: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+  dok: '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9.5 12h6M9.5 15.5h6"/>',
+  tabel: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M4 15h16M10 4v16"/>',
+  slide: '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M12 17v3M8 20h8"/>',
+  kode: '<path d="M9 8l-4 4 4 4M15 8l4 4-4 4M13 6l-2 12"/>',
+  video: '<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/>',
+  pdf: '<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9 17v-4h1.5a1.5 1.5 0 0 1 0 3H9"/>',
+  berkas: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+};
+const APLIKASI = [['web', 'Browser'], ['dok', 'Dokumen'], ['tabel', 'Lembar kerja'], ['slide', 'Presentasi'], ['kode', 'Kode'], ['video', 'Video'], ['pdf', 'PDF'], ['berkas', 'Berkas']];
+for (const d of $$('[data-dok]')) d.innerHTML = APLIKASI.map(([i, n]) => `<button class="app" title="${n}"><svg viewBox="0 0 24 24">${IKON[i]}</svg>${n}</button>`).join('');
+
+const STATUSBAR = '<span><i class="titik"></i>Online</span><span>🔋 82%</span><span>RAM 1,9 / 3,8 GB</span>';
+for (const e of $$('[data-statusbar]')) e.innerHTML = STATUSBAR;
+
+// ---------- orb: one canvas, moved into the visible layout ----------
+const kanvas = document.createElement('canvas');
+let audio = null;
+const konteks = () => (audio ||= new AudioContext());
+function pindahOrb() {
+  const wadah = document.querySelector(`.tata-${panggung.dataset.tata} [data-orb]`);
+  wadah.appendChild(kanvas);
+}
+pindahOrb();
+Orb.pasang(kanvas, konteks);
+Orb.aktif(true);
+
+// ---------- states (what the real page shows while Atlas works) ----------
+const KEADAAN = {
+  diam: { status: 'Ucapkan <b>"Atlas"</b> untuk memanggil', sub: 'atau tekan Ctrl + Alt + Spasi', cakap: [] },
+  dengar: { status: 'Mendengarkan…', sub: '"Atlas, apa jadwalku hari ini?"', cakap: [['saya', 'Atlas, apa jadwalku hari ini?']] },
+  pikir: { status: 'Sedang berpikir…', sub: 'membaca pengingat & kalender', cakap: [['saya', 'Atlas, apa jadwalku hari ini?']] },
+  claude: { status: 'Claude sedang bekerja', sub: 'merangkum laporan bulanan · 2 menit', cakap: [['saya', 'Claude, rangkum laporan bulan ini jadi satu halaman.'], ['atlas', 'Baik, Claude sedang mengerjakannya. Hasilnya muncul di sini nanti.']] },
+  bicara: { status: 'Atlas berbicara', sub: '', cakap: [['saya', 'Atlas, apa jadwalku hari ini?'], ['atlas', 'Hari ini ada empat agenda. Yang pertama rapat guru di aula jam delapan, lalu kirim laporan ke Pak Budi jam setengah sebelas.']] },
+};
+let keadaan = 'diam';
+function setKeadaan(k) {
+  keadaan = k;
+  const s = KEADAAN[k];
+  for (const e of $$('[data-status]')) e.innerHTML = `${s.status}${s.sub ? `<small>${s.sub}</small>` : ''}`;
+  for (const e of $$('[data-cakap]')) e.innerHTML = s.cakap.length ? s.cakap.map(([w, t]) => `<div class="ucap ${w}">${t}</div>`).join('') : '<div class="redup" style="font-size:21px">Percakapan muncul di sini.</div>';
+  const terakhirAtlas = s.cakap.filter(([w]) => w === 'atlas').at(-1);
+  for (const e of $$('[data-teks-c]')) { e.textContent = terakhirAtlas ? terakhirAtlas[1] : ''; e.classList.toggle('ada', !!terakhirAtlas); }
+  Orb.sibuk(k === 'pikir');
+  Orb.claude(k === 'claude');
+  Orb.bicaraPalsu?.(k === 'bicara');
+  if (k === 'dengar') Orb.mik(true); else Orb.mik(false);
+  for (const b of $$('[data-keadaan]')) b.classList.toggle('aktif', b.dataset.keadaan === k);
+}
+
+function setTata(t) {
+  panggung.dataset.tata = t;
+  pindahOrb();
+  Orb.pasang(kanvas, konteks); // re-measure in the new container (the orb's ResizeObserver watched the old one)
+  Orb.aktif(false); Orb.aktif(true);
+  for (const b of $$('[data-pilih-tata]')) b.classList.toggle('aktif', b.dataset.pilihTata === t);
+  try { localStorage.setItem('atlasos-tata', t); } catch { /* preview without storage */ }
+}
+
+// ---------- controls ----------
+for (const b of $$('[data-pilih-tata]')) b.onclick = () => setTata(b.dataset.pilihTata);
+for (const b of $$('[data-keadaan]')) b.onclick = () => setKeadaan(b.dataset.keadaan);
+for (const b of $$('[data-daya]')) b.onclick = () => document.getElementById('daya').classList.add('buka');
+for (const b of $$('[data-tutup-daya]')) b.onclick = () => document.getElementById('daya').classList.remove('buka');
+for (const b of $$('[data-laci]')) b.onclick = () => document.querySelector('[data-laci-isi]').classList.toggle('buka');
+addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase();
+  if ('123'.includes(k)) setTata('ABC'['123'.indexOf(k)]);
+  const peta = { q: 'diam', w: 'dengar', e: 'pikir', r: 'claude', t: 'bicara' };
+  if (peta[k]) setKeadaan(peta[k]);
+  if (k === 'p') document.getElementById('daya').classList.toggle('buka');
+  if (k === 'a') document.querySelector('[data-laci-isi]').classList.toggle('buka');
+  if (k === 'escape') document.getElementById('daya').classList.remove('buka');
+});
+
+let awal = 'A';
+try { awal = localStorage.getItem('atlasos-tata') || 'A'; } catch { /* ignore */ }
+const [hTata, hKeadaan] = location.hash.slice(1).split('-');
+if (/^[ABC]$/.test(hTata || '')) awal = hTata;
+setTata(awal);
+setKeadaan(KEADAAN[hKeadaan] ? hKeadaan : 'diam');
+</script>
+</body>
+</html>
