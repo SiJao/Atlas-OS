@@ -17,7 +17,7 @@ Laptop kedua yang saat dinyalakan **langsung masuk ke Atlas**, layar penuh. Tida
 | Dasar sistem | Debian 13 minimal + X11 + Openbox |
 | Tampilan | Google Chrome layar penuh (kiosk) yang menampilkan Atlas |
 | Otak | tetap di awan: Gemini (depan) + Claude Code (belakang); data tetap di laptop |
-| Status | Tahap 0 lulus, Tahap 1 selesai; Tahap 2–6 belum |
+| Status | Tahap 0 lulus, Tahap 1–2 selesai; Tahap 3–6 belum |
 
 ## 2. Rancangan sistem
 
@@ -112,7 +112,7 @@ Alurnya:
 |---|---|---|
 | 0 | Uji kelayakan: suara id-ID di Chrome Linux, RAM | ✅ **Lulus** di VirtualBox |
 | 1 | Pisah inti & lapisan OS di repo Atlas | ✅ **Selesai**: 6 commit, di-push |
-| 2 | Adaptor Linux `server/os/linux.js` | belum |
+| 2 | Adaptor Linux `server/os/linux.js` | ✅ **Selesai**: 3 commit, uji VM 18/18 |
 | 3 | Tampilan layar penuh (prototipe Chrome → dipilih) | belum |
 | 4 | Skrip pemasang Debian → Atlas OS, ukur RAM asli | belum |
 | 5 | Alur update + rollback | belum |
@@ -141,6 +141,7 @@ Alurnya:
 | Rangkuman ini | `C:\HISADA\atlas-os\SUMMARY.md` |
 | Perlengkapan & hasil Tahap 0 | `C:\HISADA\atlas-os\stage0\` (STEPS.md, test.sh, voice-test.html, test-server.mjs, stage0-result.txt) |
 | Unduhan (ISO Debian, Rufus, pemasang VirtualBox) | `C:\HISADA\atlas-os\stage0\downloads\` (lokal saja, tidak ikut repo) |
-| Mesin virtual uji | VirtualBox → **AtlasOS-Test** |
+| Mesin virtual uji | VirtualBox → **AtlasOS-Test** (live, Tahap 0) dan **AtlasOS-Disk** (Debian terpasang, Tahap 2–4; kunci SSH di `vm`, tidak ikut repo) |
+| Skrip uji Tahap 2 | `C:HISADAtlas-osstage2` (provision-vm.sh, smoke-test.sh, real-check.mjs, atspi-diag.sh) |
 | Lapisan OS (kode) | `C:\HISADA\atlas\server\os\` (repo `SiJao/atlas`) |
 | Tes pagar | `C:\HISADA\atlas\tests\os-boundary.test.mjs` |

@@ -1,11 +1,12 @@
 # Atlas OS — Dokumen Desain
 
-**Versi:** 0.4
+**Versi:** 0.5
 **Tanggal:** 2026-11-23
 **Status:**
 - **Tahap 0 LULUS** di VirtualBox (§15): pengenalan suara Bahasa Indonesia jalan di Google Chrome Linux.
 - **Tahap 1 SELESAI** (§16): lapisan OS `server/os/` di repo Atlas, 6 commit, sudah di-push.
-- Berikutnya: Tahap 2 (adaptor Linux) atau Tahap 3 (tampilan layar penuh).
+- **Tahap 2 SELESAI** (§17): adaptor Linux + pengganti pembantu.exe; 276 tes Windows lulus, uji asap VM 18/18.
+- Berikutnya: Tahap 3 (tampilan layar penuh).
 **Folder:** `C:\HISADA\atlas-os`. Proyek TERPISAH dari `C:\HISADA\atlas` dan tidak ikut repo `SiJao/atlas`.
 **Repo:** `SiJao/Atlas-OS` (**publik**, keputusan Hong Khai 2026-11-23). Unduhan besar di `stage0/downloads/` tidak ikut repo.
 **Hubungan:** Atlas yang sekarang dijelaskan di [../atlas/DESIGN.md](../atlas/DESIGN.md) dan [../atlas/SPEC.md](../atlas/SPEC.md). Dokumen ini hanya membahas cara Atlas berjalan sebagai "sistem operasi" di laptop kedua.
@@ -366,3 +367,104 @@ Tujuannya: kode Windows baru tidak bisa diam-diam masuk lagi ke inti. Saat perta
 
 - **Plus:** kode Atlas lebih rapi. Sebagian besar hal yang khusus Windows ada di satu tempat, jadi port Linux tinggal mengisi satu file adaptor. Ada tiga salinan pemanggil PowerShell yang menjadi satu.
 - **Minus:** sekitar 17 file berubah sekaligus, padahal belum ada fitur baru yang terlihat. Atlas yang sedang berjalan baru memakai kode ini setelah `berhenti.cmd` + `mulai.cmd`.
+
+## 17. Desain Tahap 2 — adaptor Linux
+
+**Disetujui 2026-11-23:**
+- kunci rahasia: **systemd-creds** (17.4 no. 1a);
+- kontrol aplikasi: **AT-SPI dikerjakan sekarang** (17.4 no. 2b);
+- uji di **VM berdisk baru**;
+- **commit per langkah, push di akhir**.
+
+**Tempat kerja:** repo Atlas, file baru `server/os/linux.js` (+ `server/os/linux-helper.js`). Antarmuka sama persis dengan `windows.js` (§16.2). `os/index.js` memilihnya bila `process.platform === 'linux'`.
+**Syarat lulus:**
+- perilaku Atlas di Windows **tidak berubah**;
+- tes lama lulus;
+- tes baru untuk `linux.js` lulus di Windows, dengan perintah Linux dipalsukan;
+- uji asap di VM Debian: server Atlas menyala dan alat-alat dasar jalan.
+
+### 17.1 Pemetaan fungsi
+
+| Antarmuka | Linux (usulan) |
+|---|---|
+| `run`, `runDetached`, `runScript` | `execFile`; skrip lewat `bash -c` |
+| `systemInfo` | CPU dari `/proc/stat`, baterai dari `/sys/class/power_supply`, disk dari `df`, proses dari `ps`, jaringan dari `/sys/class/net` |
+| `topProcesses`, `listProcesses`, `closeProcesses` | `ps -eo pid,comm,rss`; tutup = `SIGTERM`, paksa = `SIGKILL` |
+| `protectedProcesses`, `shellProcesses` | `systemd`, `Xorg`, `openbox`, `dbus-daemon`, `pipewire`, `node`, `claude`, Chrome kiosk Atlas, … |
+| `volume` | `wpctl` (PipeWire) |
+| `brightness` | `brightnessctl` (akun `atlas` masuk grup `video`) |
+| `lockScreen` | `xset s activate` / pengunci layar ringan (dipilih di Tahap 4) |
+| `power` | `systemctl poweroff/reboot/suspend` (logind mengizinkan pengguna lokal yang aktif tanpa sudo). Jeda 60 detik dan "batal" diatur oleh timer Atlas sendiri. |
+| `openApp` | hanya dari **daftar aplikasi izin** (`pengaturan.aplikasiOS`): nama → perintah (`google-chrome`, `libreoffice --writer`, `mpv`, `code`, …) |
+| `openDefault`, `openFolder` | `xdg-open` |
+| `moveToTrash`, `findInTrash` | `gio trash`; cari di `~/.local/share/Trash/info/*.trashinfo` |
+| `secretProtector` | `systemd-creds --user encrypt/decrypt` (disetujui) |
+| `riskyCommands`, `adminPattern` | pola bash: `rm`, `systemctl`, `apt`, `chmod/chown`, `crontab`, `iptables/nmcli`, `curl \| sh`, `git push`, …; naik hak: `sudo`, `su`, `pkexec`, `doas` |
+| `claudeExecutable`, `killTree` | `~/.local/bin/claude`; bunuh grup proses (`process.kill(-pid)`) |
+| `projectRoots`, `workFolder` | `~/proyek`, `~/Documents/Atlas` |
+| `WindowHelper` | `linux-helper.js` (§17.2) |
+| `openChromeApp`, `findChrome` | `google-chrome --kiosk` (Atlas OS) atau `--app` (desktop biasa) |
+
+### 17.2 Pengganti pembantu.exe
+
+`pembantu.exe` (C#) tidak bisa jalan di Linux. Penggantinya adalah kelas Node `linux-helper.js`. Kelas ini memancarkan **event yang sama** sehingga `index.js` tidak perlu tahu bedanya:
+
+| Event / fungsi | Cara di Linux |
+|---|---|
+| `jendela` (jendela aktif berganti) | `xdotool getactivewindow getwindowname` + `/proc/<pid>/comm`, dicek tiap 2 detik |
+| `diam` (detik tanpa sentuhan) | `xprintidle`, tiap 15 detik |
+| `daya` (charger, persen) | `/sys/class/power_supply`, tiap 60 detik |
+| `hotkey` (Ctrl+Alt+Space) | Keybind Openbox menulis `HOTKEY` ke FIFO `$XDG_RUNTIME_DIR/atlas-hotkey`. Helper membaca FIFO itu, jadi tidak ada pintu HTTP baru. |
+| `native` | selalu `false`: tampilan = Chrome, pengenalan suara langsung di halaman (sudah didukung `app.js`), tanpa Chrome pendengar |
+| `atur(popup/max)` | tidak ada (kiosk selalu layar penuh) |
+| `bunyi()` | `paplay` / `pw-play` suara sistem |
+| `uia`: `depan`, `klik`, `ketik`, `tombol`, `gulir`, `layar`, `kendali-mulai/selesai` | `xdotool` + tangkapan layar (`import` dari ImageMagick atau `scrot`). Tombol darurat: gerakan mouse fisik dideteksi dari perubahan posisi `xdotool getmouselocation`. |
+| `uia`: `daftar`, `tekan`, `isi` (kontrol aplikasi) | AT-SPI lewat skrip Python `server/os/linux-atspi.py` (disetujui) |
+
+### 17.3 Cara menguji
+
+1. **Di Windows (setiap commit):** tes `linux.test.mjs` memanggil `linux.js` dengan `run` palsu (keluaran `ps`, `wpctl`, `.trashinfo` contoh). Logika parsing teruji tanpa Linux.
+2. **Di VM AtlasOS-Test (akhir tahap):** Debian live + Node 24 + salinan Atlas dari server uji. Yang diuji: server menyala, `info_pc`, volume, buka/tutup aplikasi, tempat sampah + undo, kunci rahasia, hotkey FIFO.
+   - Kunci asli tidak pernah dikirim ke VM: `data/` diisi kunci palsu.
+   - **[TANYA 3]**: VM live hilang saat dimatikan. Untuk Tahap 2–4 lebih praktis memakai VM **berdisk** (Debian terpasang, ± 10 GB file di disk laptop).
+
+### 17.4 Pertanyaan
+
+1. **Kunci rahasia di Linux:**
+   - (a) `systemd-creds --user`: kunci dipegang sistem dan hanya akun itu yang bisa membuka; padanan terdekat DPAPI. Disarankan, diuji dulu di VM.
+   - (b) file terenkripsi + kunci di `~/.config/atlas` (izin 600): sederhana, tetapi siapa pun yang login sebagai `atlas` bisa membacanya.
+2. **Kontrol aplikasi** (`aplikasi_tekan` / `aplikasi_isi`):
+   - (a) belum tersedia di Linux pada Tahap 2: Atlas menjawab "belum didukung" dan menyarankan kendali mouse/keyboard. Disarankan; AT-SPI dikerjakan di Tahap 6.
+   - (b) dikerjakan sekarang lewat AT-SPI (skrip Python): lebih lama, hasilnya kurang andal di LibreOffice dan Chrome.
+3. **VM untuk uji:** tetap live, atau buat VM berdisk baru?
+4. **Commit & push:** sama seperti Tahap 1 (per langkah, push di akhir)?
+
+### 17.5 Hasil (selesai 2026-11-23)
+
+- **3 commit** di `SiJao/atlas` (`6a4d8a8` → `53e1c49`), sudah di-push dan dicek lewat GitHub API:
+  1. `linux-helper.js` + `linux-atspi.py` (pengganti pembantu.exe);
+  2. `linux.js` + `os/index.js` (memuat adaptor sesuai OS, hanya satu yang dimuat);
+  3. daftar aplikasi kendali & nama tempat sampah dari adaptor.
+- **Tes Windows:** 276/276 lulus (termasuk 17 tes baru `linux.test.mjs`).
+- **VM uji `AtlasOS-Disk`:** Debian 13.8 terpasang otomatis lewat `VBoxManage unattended install`, dikendalikan lewat SSH (kunci di `vm/`, tidak ikut repo). Disiapkan dengan `stage2/provision-vm.sh`.
+- **Uji asap dengan program Linux sungguhan** (`stage2/smoke-test.sh` + `stage2/real-check.mjs`, data palsu tanpa kunci asli): **18/18 lulus**, dan server Atlas menyala di Linux (`GET /` OK, RAM VM ± 620 MB terpakai).
+  - Lulus: info laptop, proses, volume (wpctl), kecerahan (VM tanpa backlight → pesan jelas), tempat sampah + pemulihan, **systemd-creds --user**, pengaman Claude, buka "excel" → LibreOffice Calc, jendela aktif/diam/daya, **hotkey FIFO**, AT-SPI depan (88 elemen) / daftar (94 kontrol) / isi (kolom "Find" di Find & Replace), tangkapan layar, klik/tombol/ketik/gulir, tutup proses.
+  - Tidak ada proses yang tertinggal setelah uji.
+
+**Masalah yang ditemukan uji VM dan sudah diperbaiki:**
+1. Penelusuran AT-SPI macet di lembar Calc (± 17 miliar sel). Wadah dengan > 300 anak atau `MANAGES_DESCENDANTS` kini dilewati.
+2. `xdotool mousemove --sync` gagal di sebagian server X. Diganti jeda 40 ms.
+3. Pembaca FIFO hotkey berupa `sh`/`cat` bisa tertinggal saat Atlas mati, lalu "mencuri" hotkey. Kini FIFO dibaca langsung oleh Node (`O_RDWR|O_NONBLOCK` + `net.Socket`).
+4. AT-SPI yang macet menahan proses Python. Kini Python dimatikan saat batas waktu habis dan dinyalakan ulang.
+5. Aplikasi yang baru dibuka terlambat mendaftar ke AT-SPI. Kini dicoba ulang 3× tiap 1 detik.
+6. Kolom tanpa nama (LibreOffice) kini memakai nama labelnya (`LABELLED_BY`). Combo box diisi lewat kolom teks di dalamnya.
+
+**Catatan untuk Tahap 4 (pemasang):**
+- Akun `atlas` harus masuk grup `audio` (dan `video` untuk kecerahan). PipeWire memakai kartu suara hanya dalam sesi seat aktif. Login otomatis di layar memenuhi syarat ini; SSH tidak.
+- Pemasangan otomatis VirtualBox ikut memasang GNOME (± 500 MB RAM). gdm sudah dimatikan di VM uji. Atlas OS asli **tidak** memasang desktop apa pun.
+- Variabel aksesibilitas untuk sesi X: `GTK_MODULES=gail:atk-bridge`, `SAL_USE_VCLPLUGIN=gtk3`, `QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1`. Chrome pengguna membutuhkan `--force-renderer-accessibility` (belum ditambahkan ke daftar aplikasi; dikerjakan di Tahap 4).
+
+**Belum teruji (butuh laptop asli, Tahap 6):**
+- tombol darurat dengan mouse/keyboard *fisik* (Xvfb tidak punya perangkat fisik; logika pemilahan XTEST sudah teruji di tes unit);
+- kecerahan sungguhan;
+- suara keluar ke speaker asli.
