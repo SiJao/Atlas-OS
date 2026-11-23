@@ -142,6 +142,6 @@ Alurnya:
 | Perlengkapan & hasil Tahap 0 | `C:\HISADA\atlas-os\stage0\` (STEPS.md, test.sh, voice-test.html, test-server.mjs, stage0-result.txt) |
 | Unduhan (ISO Debian, Rufus, pemasang VirtualBox) | `C:\HISADA\atlas-os\stage0\downloads\` (lokal saja, tidak ikut repo) |
 | Mesin virtual uji | VirtualBox → **AtlasOS-Test** (live, Tahap 0) dan **AtlasOS-Disk** (Debian terpasang, Tahap 2–4; kunci SSH di `C:\HISADA\atlas-os\vm\`, tidak ikut repo) |
-| Skrip uji Tahap 2 | `C:HISADAtlas-osstage2` (provision-vm.sh, smoke-test.sh, real-check.mjs, atspi-diag.sh) |
+| Skrip uji Tahap 2 | `C:\HISADA\atlas-os\stage2\` (provision-vm.sh, smoke-test.sh, real-check.mjs, atspi-diag.sh) |
 | Lapisan OS (kode) | `C:\HISADA\atlas\server\os\` (repo `SiJao/atlas`) |
 | Tes pagar | `C:\HISADA\atlas\tests\os-boundary.test.mjs` |
