@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uji Suara Atlas OS</title>
+<style>
+  :root { --bg:#0b0f14; --kartu:#141b24; --teks:#e6edf3; --redup:#8b98a5; --ok:#3fb950; --gagal:#f85149; --aksen:#58a6ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--teks); font:16px/1.5 system-ui,sans-serif; padding:16px; }
+  main { max-width:760px; margin:0 auto; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  .redup { color:var(--redup); }
+  section { background:var(--kartu); border-radius:10px; padding:14px 16px; margin:12px 0; }
+  h2 { font-size:17px; margin:0 0 8px; }
+  button { background:var(--aksen); color:#000; border:0; border-radius:6px; padding:8px 14px; font-weight:600; cursor:pointer; margin:4px 6px 4px 0; }
+  button.sekunder { background:#30363d; color:var(--teks); }
+  .status { font-weight:700; }
+  .ok { color:var(--ok); } .gagal { color:var(--gagal); }
+  #transkrip { min-height:60px; background:#0d1117; border-radius:6px; padding:8px; white-space:pre-wrap; }
+  pre { background:#0d1117; padding:8px; border-radius:6px; overflow:auto; font-size:13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Uji Suara Atlas OS — Tahap 0</h1>
+  <div class="redup" id="ua"></div>
+
+  <section>
+    <h2>1. Pengeras suara</h2>
+    <p>Tekan tombol, lalu jawab: terdengar bunyi "tit"?</p>
+    <button id="bunyi">Bunyikan</button>
+    <button class="sekunder" data-jawab="speaker" data-nilai="ya">Terdengar</button>
+    <button class="sekunder" data-jawab="speaker" data-nilai="tidak">Tidak terdengar</button>
+    <div class="status" id="s-speaker">belum diuji</div>
+  </section>
+
+  <section>
+    <h2>2. Mikrofon</h2>
+    <p>Izinkan mikrofon bila Chrome bertanya. Bicaralah; batang di bawah harus bergerak.</p>
+    <button id="mik">Mulai mikrofon</button>
+    <div style="background:#0d1117;height:14px;border-radius:7px;margin-top:8px"><div id="level" style="height:14px;width:0;background:var(--ok);border-radius:7px"></div></div>
+    <div class="status" id="s-mik">belum diuji</div>
+  </section>
+
+  <section>
+    <h2>3. Pengenalan suara Bahasa Indonesia (yang terpenting)</h2>
+    <p>Tekan "Mulai dengar", lalu ucapkan: <b>"Atlas, buka pengingat hari ini"</b>.</p>
+    <button id="dengar">Mulai dengar</button>
+    <button class="sekunder" id="henti">Berhenti</button>
+    <div id="transkrip" class="redup">(hasil muncul di sini)</div>
+    <div class="status" id="s-dengar">belum diuji</div>
+  </section>
+
+  <section>
+    <h2>4. Simpan hasil</h2>
+    <button id="simpan">Simpan hasil (voice-result.json)</button>
+    <pre id="ringkas"></pre>
+  </section>
+</main>
+<script>
+const hasil = {
+  waktu: new Date().toISOString(),
+  userAgent: navigator.userAgent,
+  adaSpeechRecognition: !!(window.SpeechRecognition || window.webkitSpeechRecognition),
+  speaker: null, mikrofon: null, mikrofonLevelMaks: 0,
+  dengar: { status: null, galat: [], transkrip: [], mulaiKeHasilMs: null }
+};
+const $ = id => document.getElementById(id);
+$('ua').textContent = navigator.userAgent;
+function tandai(id, ok, teks) { const el = $(id); el.textContent = teks; el.className = 'status ' + (ok ? 'ok' : 'gagal'); ringkas(); }
+function ringkas() { $('ringkas').textContent = JSON.stringify(hasil, null, 2); }
+
+// 1. Pengeras suara
+$('bunyi').onclick = () => {
+  const ctx = new AudioContext(); const o = ctx.createOscillator(); const g = ctx.createGain();
+  o.frequency.value = 880; g.gain.value = 0.2; o.connect(g).connect(ctx.destination); o.start(); o.stop(ctx.currentTime + 0.6);
+};
+document.querySelectorAll('[data-jawab="speaker"]').forEach(b => b.onclick = () => {
+  hasil.speaker = b.dataset.nilai === 'ya'; tandai('s-speaker', hasil.speaker, hasil.speaker ? 'OK: terdengar' : 'GAGAL: tidak terdengar');
+});
+
+// 2. Mikrofon
+$('mik').onclick = async () => {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const ctx = new AudioContext(); const an = ctx.createAnalyser(); an.fftSize = 512;
+    ctx.createMediaStreamSource(stream).connect(an);
+    const data = new Uint8Array(an.fftSize);
+    hasil.mikrofon = true; tandai('s-mik', true, 'OK: mikrofon terbuka (lihat batang bergerak)');
+    (function loop() {
+      an.getByteTimeDomainData(data);
+      let maks = 0; for (const v of data) maks = Math.max(maks, Math.abs(v - 128));
+      const persen = Math.min(100, maks / 128 * 250);
+      $('level').style.width = persen + '%';
+      if (persen > hasil.mikrofonLevelMaks) { hasil.mikrofonLevelMaks = Math.round(persen); ringkas(); }
+      requestAnimationFrame(loop);
+    })();
+  } catch (e) {
+    hasil.mikrofon = false; tandai('s-mik', false, 'GAGAL: ' + e.name + ' ' + e.message);
+  }
+};
+
+// 3. Pengenalan suara
+let rec = null, mulai = 0;
+$('dengar').onclick = () => {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { hasil.dengar.status = 'tidak-ada-api'; tandai('s-dengar', false, 'GAGAL: browser ini tidak punya SpeechRecognition'); return; }
+  rec = new SR(); rec.lang = 'id-ID'; rec.continuous = true; rec.interimResults = true;
+  mulai = performance.now(); $('transkrip').textContent = ''; $('transkrip').className = '';
+  rec.onresult = ev => {
+    let teks = '';
+    for (let i = 0; i < ev.results.length; i++) {
+      teks += ev.results[i][0].transcript + (ev.results[i].isFinal ? '  ✓\n' : '');
+      if (ev.results[i].isFinal && !hasil.dengar.transkrip.includes(ev.results[i][0].transcript)) hasil.dengar.transkrip.push(ev.results[i][0].transcript);
+    }
+    if (hasil.dengar.mulaiKeHasilMs === null) hasil.dengar.mulaiKeHasilMs = Math.round(performance.now() - mulai);
+    $('transkrip').textContent = teks;
+    hasil.dengar.status = 'berhasil'; tandai('s-dengar', true, 'OK: suara dikenali');
+  };
+  rec.onerror = ev => {
+    hasil.dengar.galat.push(ev.error);
+    if (hasil.dengar.status !== 'berhasil') { hasil.dengar.status = 'galat'; tandai('s-dengar', false, 'GAGAL: ' + ev.error + (ev.error === 'network' ? ' (layanan suara Google tidak tersedia di browser ini)' : '')); }
+  };
+  rec.onend = () => { if (hasil.dengar.status === null) { hasil.dengar.status = 'tanpa-hasil'; tandai('s-dengar', false, 'Berhenti tanpa hasil. Coba lagi dan bicara lebih jelas.'); } };
+  rec.start(); $('s-dengar').textContent = 'mendengarkan…'; $('s-dengar').className = 'status';
+};
+$('henti').onclick = () => rec && rec.stop();
+
+// 4. Simpan
+$('simpan').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(hasil, null, 2)], { type: 'application/json' }));
+  a.download = 'voice-result.json'; a.click();
+};
+ringkas();
+</script>
+</body>
+</html>

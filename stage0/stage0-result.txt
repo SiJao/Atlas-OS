@@ -1,0 +1,38 @@
+=== Uji Tahap 0 Atlas OS — 2026-11-23 09:14:27 ===
+Kernel: 6.12.117+deb13-amd64
+CPU:  Intel(R) Celeron(R) N4020 CPU @ 1.10GHz
+RAM dasar (desktop LXDE/Openbox, sebelum Chrome): terpakai 656 MB, tersedia 2322 MB dari 2978 MB
+Kartu suara (rekam):
+card 0: Intel [HDA Intel], device 0: STAC9221 A1 Analog [STAC9221 A1 Analog]
+card 0: Intel [HDA Intel], device 1: STAC9221 A1 Digital [STAC9221 A1 Digital]
+card 0: Intel [HDA Intel], device 2: STAC9221 A1 Alt Analog [STAC9221 A1 Alt Analog]
+
+--- Internet ---
+OK
+
+--- Memasang Google Chrome (hanya di RAM) ---
+Google Chrome 158.0.8127.36 
+
+--- Halaman uji ---
+RAM Chrome (halaman uji terbuka): 141 MB
+RAM total sekarang: terpakai 1442 MB, tersedia 1535 MB dari 2978 MB
+RAM Chrome (setelah pengenalan suara): 520 MB
+RAM total setelah uji: terpakai 2008 MB, tersedia 970 MB dari 2978 MB
+
+--- Hasil halaman uji ---
+{
+  "waktu": "2026-11-23T09:16:43.355Z",
+  "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36",
+  "adaSpeechRecognition": true,
+  "speaker": true,
+  "mikrofon": true,
+  "mikrofonLevelMaks": 100,
+  "dengar": {
+    "status": "berhasil",
+    "galat": [],
+    "transkrip": [
+      "atlas buka peringatan hari ini"
+    ],
+    "mulaiKeHasilMs": 2142
+  }
+}
