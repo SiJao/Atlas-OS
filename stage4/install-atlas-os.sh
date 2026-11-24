@@ -54,7 +54,7 @@ VIDEO=(xserver-xorg-video-fbdev)
 [ "$(systemd-detect-virt 2>/dev/null || true)" = "oracle" ] && VIDEO+=(xserver-xorg-video-vmware) # VirtualBox test VM
 "${APT[@]}" \
   xserver-xorg-core xserver-xorg-input-libinput "${VIDEO[@]}" xinit x11-xserver-utils xinput openbox \
-  xdotool wmctrl pciutils xprintidle imagemagick python3 python3-gi gir1.2-atspi-2.0 at-spi2-core dbus-user-session \
+  xdotool wmctrl x11-utils pciutils xprintidle imagemagick python3 python3-gi gir1.2-atspi-2.0 at-spi2-core dbus-user-session \
   pipewire pipewire-pulse pipewire-bin wireplumber pulseaudio-utils sound-theme-freedesktop \
   network-manager polkitd brightnessctl libglib2.0-bin xdg-utils zram-tools \
   firmware-iwlwifi firmware-realtek firmware-atheros firmware-misc-nonfree \
@@ -282,20 +282,26 @@ polkit.addRule(function (action, subject) {
                "org.freedesktop.login1.reboot", "org.freedesktop.login1.reboot-multiple-sessions",
                "org.freedesktop.login1.suspend", "org.freedesktop.login1.suspend-multiple-sessions"];
   if (power.indexOf(action.id) >= 0) return polkit.Result.YES;
-  if (action.id.indexOf("org.freedesktop.NetworkManager.") === 0) return polkit.Result.YES;
+  // NetworkManager (DESIGN §23 D): only what the Wi-Fi/network panel needs: connect/disconnect, Wi-Fi on/off, scan,
+  // save a new Wi-Fi network. Not: all networking off, hostname, global DNS, hotspot, reload, checkpoints.
+  var nm = ["org.freedesktop.NetworkManager.network-control", "org.freedesktop.NetworkManager.enable-disable-wifi",
+            "org.freedesktop.NetworkManager.wifi.scan", "org.freedesktop.NetworkManager.settings.modify.system",
+            "org.freedesktop.NetworkManager.settings.modify.own"];
+  if (nm.indexOf(action.id) >= 0) return polkit.Result.YES;
   // Settings window (DESIGN §22.2): time zone and automatic time only (not setting the clock by hand).
   if (action.id === "org.freedesktop.timedate1.set-timezone" || action.id === "org.freedesktop.timedate1.set-ntp") return polkit.Result.YES;
   return polkit.Result.NOT_HANDLED;
 });
 EOF
 systemctl restart polkit >/dev/null 2>&1 || true
-# Chrome policy (DESIGN §22.3): microphone allowed without asking for Atlas's own pages only. Replaces the
+# Chrome policy (DESIGN §22.3, §23 C): microphone allowed without asking for the Atlas window only
+# (http://127.0.0.1:4950; the desktop on localhost needs no microphone). Replaces the
 # --use-fake-ui-for-media-stream flag, which shows a warning bar now that Chrome no longer runs in --kiosk.
 install -d /etc/opt/chrome/policies/managed
 cat > /etc/opt/chrome/policies/managed/atlas-os.json <<'EOF'
 {
-  "AudioCaptureAllowedUrls": ["http://127.0.0.1:4950", "http://localhost:4950"],
-  "AutoplayAllowlist": ["http://127.0.0.1:4950", "http://localhost:4950"]
+  "AudioCaptureAllowedUrls": ["http://127.0.0.1:4950"],
+  "AutoplayAllowlist": ["http://127.0.0.1:4950"]
 }
 EOF
 install -d /etc/NetworkManager/conf.d

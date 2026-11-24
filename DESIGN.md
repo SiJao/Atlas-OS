@@ -11,6 +11,7 @@
 - **Tahap 5 SELESAI** (§20): pembaruan dari GitHub dengan izin (tombol + kartu), uji jalan, cadangan data, cek kesehatan, kembali otomatis; diuji di VM termasuk versi rusak; 292 tes Windows lulus.
 - **Perbaikan uji coba Hong Khai SELESAI** (§21): tombol tanpa obrolan + popup gagal, daya langsung, panel Jaringan (kabel), Mode admin.
 - **Desktop baru + Pengaturan SELESAI** (§22): bar menu Atlas, notch ringkas, dok, jendela Atlas mengambang, Pengaturan 11 kategori; diuji di VM; 310 tes Windows lulus.
+- **Temuan pemeriksa plugin SELESAI** (§23): 8 bug + 5 perbaikan keamanan (akun sambungan, profil Chrome dikunci, mikrofon, polkit NetworkManager, audit); diuji di VM; 319 tes.
 - Berikutnya: Tahap 6 (laptop asli).
 **Folder:** `C:\HISADA\atlas-os`. Proyek TERPISAH dari `C:\HISADA\atlas` dan tidak ikut repo `SiJao/atlas`.
 **Repo:** `SiJao/Atlas-OS` (**publik**, keputusan Hong Khai 2026-11-23). Unduhan besar di `stage0/downloads/` tidak ikut repo.
@@ -117,7 +118,7 @@ Inti tidak boleh lagi memanggil `powershell.exe`, `pembantu.exe`, atau path `C:\
 
 | Fungsi | Windows sekarang | Linux (usulan) |
 |---|---|---|
-| Jendela & tampilan | `pembantu.exe` + WebView2, notch, orb | Google Chrome `--kiosk` layar penuh, dijalankan oleh Openbox |
+| Jendela & tampilan | `pembantu.exe` + WebView2, notch, orb | Google Chrome `--kiosk` layar penuh, dijalankan oleh Openbox (*sejak §22.3: desktop + jendela Atlas, tanpa `--kiosk`*) |
 | Hotkey global | `pembantu.exe` (Ctrl+Alt+Space) | Keybind Openbox → `curl` ke server lokal |
 | Jendela aktif, waktu diam | `pembantu.exe` (JENDELA, DIAM) | `xdotool getactivewindow` / `xprintidle` |
 | Daya baterai | `pembantu.exe` (DAYA) | `/sys/class/power_supply/` |
@@ -408,7 +409,7 @@ Tujuannya: kode Windows baru tidak bisa diam-diam masuk lagi ke inti. Saat perta
 | `claudeExecutable`, `killTree` | `~/.local/bin/claude`; bunuh grup proses (`process.kill(-pid)`) |
 | `projectRoots`, `workFolder` | `~/proyek`, `~/Documents/Atlas` |
 | `WindowHelper` | `linux-helper.js` (§17.2) |
-| `openChromeApp`, `findChrome` | `google-chrome --kiosk` (Atlas OS) atau `--app` (desktop biasa) |
+| `openChromeApp`, `findChrome` | `google-chrome --kiosk` (Atlas OS) atau `--app` (desktop biasa) (*sejak §22.3: `--app=…/?window=1` tanpa `--kiosk`*) |
 
 ### 17.2 Pengganti pembantu.exe
 
@@ -563,6 +564,7 @@ BIOS → Debian → getty tty1 login otomatis "atlas"
   → ~/.bash_profile: startx (hanya di tty1)
     → Openbox (tanpa menu klik-kanan, tanpa panel; hanya hotkey Atlas + Alt+Tab)
       → autostart: tunggu server Atlas → Chrome --kiosk /?kiosk=1 (diulang bila Chrome tertutup)
+        [sejak §22.3: Chrome tanpa --kiosk → desktop http://localhost:4950/desktop + jendela Atlas /?window=1]
   → systemd --user: atlas.service (server Node, ATLAS_DATA=~/atlas-data, ATLAS_KIOSK=1, Restart=on-failure)
       → gagal 3× dalam 2 menit → atlas-pemulihan.service: halaman pemulihan sederhana
          (galat terakhir + tombol "mulai ulang Atlas" / "mulai ulang laptop")
@@ -880,3 +882,50 @@ Atlas `7afd7dd`. Tes Windows 310/310 (termasuk 12 tes baru `tests/settings.test.
 9. **Bingkai jendela Atlas menimpa bar**: `wmctrl` menaruh isi jendela, sedangkan bar judul Openbox ada di atasnya. Posisi kini memperhitungkan bar judul.
 
 **Belum diuji di VM:** suara mikrofon sungguhan & notch saat benar-benar berbicara (butuh kunci Gemini), suspend otomatis, kunci Wi-Fi asli. Semuanya untuk Tahap 6 (laptop asli).
+
+## 23. Temuan pemeriksa plugin `atlas-os-engineering` (2026-11-24)
+
+Hong Khai memasang plugin `atlas-os-engineering` (zip buatannya sendiri) dan meminta plugin itu dipakai. Dua pemeriksa independen dari plugin (`security-auditor`, `qa-test-engineer`) memeriksa Atlas `7afd7dd` + Atlas-OS `2f1553e` dengan membaca kode dan menjalankan tes (310/310). Tidak ada temuan keamanan tingkat tinggi. **Keputusan Hong Khai: kerjakan semuanya.**
+
+### 23.1 Bug
+
+| No | Bug | Perbaikan |
+|---|---|---|
+| 1 | Tidur otomatis berulang: setelah tidur > 10 menit dan dibangunkan tanpa sentuhan mouse/keyboard, waktu diam masih besar, jadi laptop langsung tidur lagi | Tidur hanya bila masa diam **dimulai setelah** tidur terakhir |
+| 2 | Ikon Atlas di dok tidak pernah menyembunyikan jendela: saat diklik, yang aktif adalah jendela desktop | Ditentukan dari urutan tumpukan jendela (`_NET_CLIENT_LIST_STACKING`): Atlas paling atas dan tidak diminimalkan → sembunyikan; selain itu → tampilkan |
+| 3 | Baterai mouse/keyboard nirkabel (`scope=Device`) terbaca sebagai baterai laptop | Abaikan baterai perangkat; `capacity` kosong = tidak terbaca (bukan 0 %) |
+| 4 | Input aneh: `NaN` sampai ke `brightnessctl`/`wpctl`; kunci `constructor` menimbulkan galat 500; angka negatif di `system-settings.json` diterima | Angka diperiksa; tabel memakai `Object.hasOwn`; nilai tersimpan hanya dari daftar pilihan |
+| 5 | `atlas-kiosk` bisa `kill` nomor proses lama | Hanya `pkill` per profil |
+| 6 | Pengaturan simpanan gagal dipasang bila X belum siap saat Atlas mulai | Dicoba ulang beberapa kali |
+| 7 | Jendela Atlas ganda bila judul halaman lambat muncul | Jendela Atlas dikenali dari kelasnya saja (`127.0.0.1` persis), bukan judul |
+| 8 | Pengaturan memuat ulang halaman setelah Atlas tersambung lagi, sehingga sandi yang sedang diketik hilang | Tidak dimuat ulang bila ada kolom yang sedang diisi |
+
+### 23.2 Keamanan
+
+- **A. Hanya akun atlas (dan root) yang boleh memakai server Atlas.** Rancangan awal (token di halaman) tidak menghentikan program lokal, karena program itu bisa membuka halaman yang sama dan membaca tokennya. Yang benar-benar menjaga: di Linux, pemilik (UID) setiap sambungan ke `127.0.0.1:4950` dibaca dari `/proc/net/tcp`; sambungan dari akun lain ditolak (403). Program yang berjalan sebagai `atlas` memang sudah dipercaya penuh (mereka bisa mengubah data Atlas langsung). Windows tidak berubah.
+- **B. Profil Chrome Atlas dikunci.** Kebijakan Chrome berlaku untuk seluruh mesin, termasuk Browser di dok, jadi pemblokiran URL tidak dipakai. Sebagai gantinya, `atlas-kiosk` menutup setiap jendela browser biasa (Ctrl+N / Ctrl+T) dan DevTools yang muncul di profil Chrome Atlas. Ini hanya penghalang, bukan sandbox.
+- **C. Mikrofon** otomatis hanya untuk `http://127.0.0.1:4950` (jendela Atlas). `localhost` dihapus, karena desktop tidak butuh mikrofon.
+- **D. Polkit NetworkManager dipersempit.** Yang tetap diizinkan: `network-control`, `enable-disable-wifi`, `wifi.scan`, `settings.modify.system` (menyimpan Wi-Fi baru), `settings.modify.own`. Yang tidak lagi diizinkan: mematikan seluruh jaringan, nama host, DNS global, hotspot, dan lainnya.
+- **E. Audit Pengaturan.** Semua kunci dicatat, berhasil maupun gagal, beserta nilai yang bukan rahasia.
+- Dicatat saja: indikator notch "mendengar" bukan indikator privasi (bisa dipalsukan program lokal).
+
+### 23.3 Dokumen
+
+Empat tempat di SUMMARY/DESIGN yang masih menulis `Chrome --kiosk /?kiosk=1` diperbarui atau ditandai "diganti §22.3".
+
+### 23.4 Hasil (2026-11-24)
+
+Atlas `0733cf0`. Tes Windows 319/319, termasuk 9 tes baru di `tests/settings.test.mjs`. Diuji di VM `AtlasOS-Install` setelah pemasang dijalankan ulang:
+
+| Uji | Hasil |
+|---|---|
+| A — akun lain (`atlasadmin`) memanggil API, termasuk POST dengan Origin palsu | ✅ 403 "Akun ditolak"; akun `atlas` dan root 200; Chrome & `atlas-kiosk` tetap jalan |
+| B — jendela browser biasa dibuka di profil Chrome Atlas | ✅ tertutup sendiri dalam ± 1 dtk |
+| C — kebijakan Chrome | ✅ mikrofon/suara otomatis hanya `http://127.0.0.1:4950` |
+| D — `nmcli networking off` / ganti nama host sebagai atlas | ✅ ditolak; Wi-Fi nyala/mati tetap bisa |
+| No. 4 — `volume=abc`, `?bagian=constructor` | ✅ 400 dengan pesan jelas |
+| E — audit | ✅ perubahan gagal tercatat beserta nilainya |
+| No. 2 — ikon Atlas di dok | ✅ klik 1 menyembunyikan, klik 2 menampilkan; saat Calc di atas, klik membawa Atlas ke depan |
+| Menyala ulang | ✅ desktop + jendela Atlas, satu jendela masing-masing |
+
+Belum bisa diuji di VM: tidur otomatis setelah bangun (no. 1) dan baterai mouse nirkabel (no. 3). Keduanya hanya diuji lewat tes unit; uji perangkat keras di Tahap 6.

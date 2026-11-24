@@ -24,7 +24,7 @@ Laptop kedua yang saat dinyalakan **langsung masuk ke Atlas**, layar penuh, tanp
 ┌──────────────────────────── Laptop 2 (Atlas OS) ─────────────────────────────┐
 │ Debian 13 minimal → login otomatis tty1 akun "atlas" (tanpa sudo)            │
 │   └ startx → Openbox terkunci (tanpa menu/panel; Ctrl+Alt+Spasi, Alt+Tab)     │
-│       └ atlas-kiosk → Chrome --kiosk /?kiosk=1 (dibuka lagi bila tertutup)    │
+│       └ atlas-kiosk → Chrome: desktop + jendela Atlas (§22, dibuka lagi)      │
 │             │ HTTP + SSE (127.0.0.1:4950)                                      │
 │ systemd --user:                                                               │
 │   atlas.service ── server Node Atlas ──┬─► Gemini API                         │
