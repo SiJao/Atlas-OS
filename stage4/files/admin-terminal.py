@@ -4,6 +4,8 @@
 #   admin-terminal.py --cek <user>          password on stdin -> exit 0 if correct (via `su <user> -c true`)
 #   admin-terminal.py --buka <user> <file>  run INSIDE xterm: read the password from a one-time 0600 file
 #                                           (deleted right away), start `su -l <user>` and type it for you
+#   admin-terminal.py --pasang <user> <pkg>…  password on stdin -> `apt-get install` as the admin (via su + sudo).
+#                                           Only packages of the Atlas OS app catalog (DESIGN §24 P3-2) are accepted.
 import os
 import pty
 import select
@@ -12,9 +14,11 @@ import time
 
 ENV = {**os.environ, 'LC_ALL': 'C', 'LANG': 'C'}  # English "Password:" prompt, whatever the locale
 PROMPT = b'assword:'
+# DESIGN §24 P3-2: the only packages the Settings app catalog may install. Anything else is refused here too.
+CATALOG = {'vlc', 'audacity', 'pinta', 'thunderbird', 'gimp', 'inkscape', 'guvcview'}
 
 
-def run_su(argv, password, interactive):
+def run_su(argv, password, interactive, again=False):
     pid, fd = pty.fork()
     if pid == 0:
         os.execvpe(argv[0], argv, ENV)
@@ -33,6 +37,9 @@ def run_su(argv, password, interactive):
             buf += data
             if PROMPT in buf:
                 os.write(fd, password.encode() + b'\n')
+                if again:  # the command itself runs `sudo -S`: same password once more, read from the terminal
+                    time.sleep(1.5)
+                    os.write(fd, password.encode() + b'\n')
                 sent = True
     password = None  # forget it as soon as it is typed
     if not interactive:
@@ -79,6 +86,13 @@ def main():
     if mode == '--cek':
         password = sys.stdin.readline().rstrip('\n')
         sys.exit(0 if run_su(['su', user, '-c', 'true'], password, False) == 0 else 1)
+    if mode == '--pasang':
+        pkgs = sys.argv[3:]
+        if not pkgs or any(p not in CATALOG for p in pkgs):
+            sys.exit(3)
+        password = sys.stdin.readline().rstrip('\n')
+        cmd = 'sudo -S -p "" env DEBIAN_FRONTEND=noninteractive apt-get install -y -q --no-install-recommends ' + ' '.join(pkgs)
+        sys.exit(run_su(['su', '-l', user, '-c', cmd], password, False, again=True))
     if mode == '--buka':
         path = sys.argv[3]
         with open(path) as f:

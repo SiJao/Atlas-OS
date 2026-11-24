@@ -1,0 +1,16 @@
+#!/bin/bash
+# Atlas OS screen lock (DESIGN §24 P1-5). Started by xss-lock (sleep, screensaver/screen off) and by Atlas's
+# "Kunci sekarang". Unlocks with the owner's PIN: PAM service "atlas-lock" (pam_pwdfile) checks
+# ~/.config/atlas-os/pin.hash. No PIN set = no lock (never lock the owner out with an unknown secret).
+# Forgotten PIN: Ctrl+Alt+F2, log in as the admin, delete /home/atlas/.config/atlas-os/pin.hash, then
+# "sudo pkill -x xsecurelock".
+PIN="$HOME/.config/atlas-os/pin.hash"
+[ -s "$PIN" ] || exit 0
+pgrep -u "$(id -u)" -x xsecurelock >/dev/null && exit 0   # already locked
+export XSECURELOCK_PAM_SERVICE=atlas-lock
+export XSECURELOCK_PASSWORD_PROMPT=asterisks
+export XSECURELOCK_SHOW_DATETIME=1 XSECURELOCK_DATETIME_FORMAT='%A, %d %B %Y  %H:%M'
+export XSECURELOCK_SHOW_USERNAME=0 XSECURELOCK_SHOW_HOSTNAME=0
+export XSECURELOCK_FONT='DejaVu Sans:size=18'
+export XSECURELOCK_AUTH_BACKGROUND_COLOR='#0B1220' XSECURELOCK_AUTH_FOREGROUND_COLOR='#E6EDF7'
+exec xsecurelock

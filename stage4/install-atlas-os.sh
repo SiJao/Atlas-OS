@@ -60,7 +60,17 @@ VIDEO=(xserver-xorg-video-fbdev)
   firmware-iwlwifi firmware-realtek firmware-atheros firmware-misc-nonfree \
   fonts-dejavu-core fonts-noto-core fonts-noto-color-emoji \
   google-chrome-stable libreoffice-writer libreoffice-calc libreoffice-impress libreoffice-gtk3 \
-  mpv evince pcmanfm code xterm >/dev/null
+  mpv evince pcmanfm code xterm \
+  udisks2 ntfs-3g exfatprogs dosfstools \
+  xsecurelock xss-lock libpam-pwdfile openssl \
+  unattended-upgrades apt-listchanges \
+  locales x11-xkb-utils \
+  cups cups-browsed ipp-usb printer-driver-cups-pdf bluez libspa-0.2-bluetooth \
+  xarchiver unzip ristretto galculator mousepad rsync >/dev/null
+# DESIGN §24 P1-8: Indonesian for LibreOffice + spelling, Arabic fonts. Optional: skipped if a name is missing.
+for p in libreoffice-l10n-id hunspell-id fonts-hosny-amiri fonts-sil-scheherazade-new fonts-kacst 7zip printer-driver-gutenprint; do
+  "${APT[@]}" "$p" >/dev/null 2>&1 || echo "lewati paket opsional: $p"
+done
 echo "terpasang: $(google-chrome --version), LibreOffice $(dpkg-query -W -f='${Version}' libreoffice-core 2>/dev/null), VS Code $(dpkg-query -W -f='${Version}' code)"
 
 langkah "4. Node.js $NODE_VERSION di /opt/node (checksum diperiksa)"
@@ -105,6 +115,11 @@ cat > "$H/.xinitrc" <<'EOF'
 # Atlas OS X session (DESIGN §19.3). Accessibility on, so Atlas can read/press controls (AT-SPI).
 export GTK_MODULES=gail:atk-bridge QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 SAL_USE_VCLPLUGIN=gtk3 NO_AT_BRIDGE=0
 export ATLAS_DATA="$HOME/atlas-data" ATLAS_KIOSK=1
+# DESIGN §24 P1-8: the session (Chrome, LibreOffice, ...) in Indonesian. The Atlas server keeps its own default
+# language, so the output of the system tools it reads does not change.
+locale -a 2>/dev/null | grep -qi '^id_ID.utf8' && export LANG=id_ID.UTF-8 LANGUAGE=id:en
+# DESIGN §24 P1-4: display scale chosen in Settings (Xft.dpi), read by Chrome, GTK/LibreOffice and VS Code.
+[ -f "$HOME/.config/atlas-os/Xresources" ] && xrdb -merge "$HOME/.config/atlas-os/Xresources"
 systemctl --user import-environment DISPLAY XAUTHORITY GTK_MODULES QT_LINUX_ACCESSIBILITY_ALWAYS_ON SAL_USE_VCLPLUGIN
 dbus-update-activation-environment --systemd DISPLAY XAUTHORITY GTK_MODULES QT_LINUX_ACCESSIBILITY_ALWAYS_ON SAL_USE_VCLPLUGIN
 systemctl --user reset-failed atlas.service 2>/dev/null
@@ -112,7 +127,9 @@ systemctl --user restart atlas.service
 exec openbox-session
 EOF
 cat > "$H/.config/openbox/autostart" <<'EOF'
-xset s off; xset s noblank; xset dpms 0 0 900    # no screensaver; screen off after 15 min idle
+xset s off; xset s noblank; xset dpms 0 0 900    # no screensaver; screen off after 15 min idle (Atlas adjusts)
+# DESIGN §24 P1-5: lock on sleep and when the screen saver fires (only when a PIN is set; see atlas-lock).
+xss-lock -l -- /opt/atlas-os/atlas-lock &
 "$HOME/.local/bin/atlas-kiosk" &
 EOF
 # Openbox: no desktop menu, no panel; only Atlas's hotkey, Alt+Tab between open apps, and Alt+F4.
@@ -129,6 +146,16 @@ cat > "$H/.config/openbox/rc.xml" <<'EOF'
   <margins><top>34</top><bottom>84</bottom><left>0</left><right>0</right></margins>
   <keyboard>
     <keybind key="C-A-space"><action name="Execute"><command>sh -c 'echo HOTKEY &gt; "$XDG_RUNTIME_DIR/atlas-hotkey"'</command></action></keybind>
+    <keybind key="W-space"><action name="Execute"><command>sh -c 'echo LAYOUT &gt; "$XDG_RUNTIME_DIR/atlas-hotkey"'</command></action></keybind>
+    <!-- DESIGN §24 P2-5/6: screenshots and Fn keys go to Atlas through the same FIFO -->
+    <keybind key="Print"><action name="Execute"><command>sh -c 'echo SCREENSHOT &gt; "$XDG_RUNTIME_DIR/atlas-hotkey"'</command></action></keybind>
+    <keybind key="A-Print"><action name="Execute"><command>sh -c 'echo SCREENSHOT-WINDOW &gt; "$XDG_RUNTIME_DIR/atlas-hotkey"'</command></action></keybind>
+    <keybind key="XF86AudioRaiseVolume"><action name="Execute"><command>sh -c 'echo VOLUME-UP &gt; "$XDG_RUNTIME_DIR/atlas-hotkey"'</command></action></keybind>
+    <keybind key="XF86AudioLowerVolume"><action name="Execute"><command>sh -c 'echo VOLUME-DOWN &gt; "$XDG_RUNTIME_DIR/atlas-hotkey"'</command></action></keybind>
+    <keybind key="XF86AudioMute"><action name="Execute"><command>sh -c 'echo VOLUME-MUTE &gt; "$XDG_RUNTIME_DIR/atlas-hotkey"'</command></action></keybind>
+    <keybind key="XF86MonBrightnessUp"><action name="Execute"><command>sh -c 'echo BRIGHT-UP &gt; "$XDG_RUNTIME_DIR/atlas-hotkey"'</command></action></keybind>
+    <keybind key="XF86PowerOff"><action name="Execute"><command>sh -c 'echo POWER &gt; "$XDG_RUNTIME_DIR/atlas-hotkey"'</command></action></keybind>
+    <keybind key="XF86MonBrightnessDown"><action name="Execute"><command>sh -c 'echo BRIGHT-DOWN &gt; "$XDG_RUNTIME_DIR/atlas-hotkey"'</command></action></keybind>
     <keybind key="A-Tab"><action name="NextWindow"/></keybind>
     <keybind key="A-F4"><action name="Close"/></keybind>
   </keyboard>
@@ -178,7 +205,7 @@ StartLimitBurst=3
 OnFailure=atlas-recovery.service
 
 [Service]
-Environment=ATLAS_DATA=%h/atlas-data ATLAS_KIOSK=1
+Environment=ATLAS_DATA=%h/atlas-data ATLAS_KIOSK=1 ATLAS_APP_LANG=id_ID.UTF-8
 WorkingDirectory=/opt/atlas/current
 ExecStart=/opt/node/bin/node server/index.js
 Restart=on-failure
@@ -290,6 +317,12 @@ polkit.addRule(function (action, subject) {
   if (nm.indexOf(action.id) >= 0) return polkit.Result.YES;
   // Settings window (DESIGN §22.2): time zone and automatic time only (not setting the clock by hand).
   if (action.id === "org.freedesktop.timedate1.set-timezone" || action.id === "org.freedesktop.timedate1.set-ntp") return polkit.Result.YES;
+  // Flashdisk (DESIGN §24 P1-2): mount / unmount / power off REMOVABLE drives only. Internal disks stay admin-only.
+  var usb = ["org.freedesktop.udisks2.filesystem-mount", "org.freedesktop.udisks2.filesystem-mount-other-seat",
+             "org.freedesktop.udisks2.filesystem-unmount-others", "org.freedesktop.udisks2.eject-media",
+             "org.freedesktop.udisks2.eject-media-other-seat", "org.freedesktop.udisks2.power-off-drive",
+             "org.freedesktop.udisks2.power-off-drive-other-seat"];
+  if (usb.indexOf(action.id) >= 0 && action.lookup("drive.removable") === "true") return polkit.Result.YES;
   return polkit.Result.NOT_HANDLED;
 });
 EOF
@@ -306,6 +339,93 @@ cat > /etc/opt/chrome/policies/managed/atlas-os.json <<'EOF'
 EOF
 install -d /etc/NetworkManager/conf.d
 printf '[ifupdown]\nmanaged=true\n' > /etc/NetworkManager/conf.d/10-atlas-os-manage-all.conf
+
+# ---- DESIGN §24 P1 ----
+# P1-5 screen lock: PIN checked by pam_pwdfile against a file the atlas user owns (written by Atlas Settings).
+install -m 755 "$HERE/files/atlas-lock" /opt/atlas-os/atlas-lock
+cat > /etc/pam.d/atlas-lock <<EOF
+# Atlas OS lock screen (DESIGN §24 P1-5): the owner's PIN, not the account password.
+auth     required pam_pwdfile.so pwdfile=$H/.config/atlas-os/pin.hash
+account  required pam_permit.so
+EOF
+# P1-7 security updates: Debian security + point releases, Google Chrome, VS Code. No automatic reboot.
+cat > /etc/apt/apt.conf.d/20auto-upgrades <<'EOF'
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+APT::Periodic::AutocleanInterval "7";
+EOF
+cat > /etc/apt/apt.conf.d/52atlas-os-unattended <<'EOF'
+// Atlas OS (DESIGN §24 P1-7)
+Unattended-Upgrade::Origins-Pattern {
+        "origin=Debian,codename=${distro_codename},label=Debian";
+        "origin=Debian,codename=${distro_codename}-security,label=Debian-Security";
+        "origin=Debian,codename=${distro_codename}-updates";
+        "site=dl.google.com";
+        "site=packages.microsoft.com";
+};
+Unattended-Upgrade::Automatic-Reboot "false";
+Unattended-Upgrade::Remove-Unused-Dependencies "true";
+EOF
+systemctl enable --now apt-daily.timer apt-daily-upgrade.timer >/dev/null 2>&1 || true
+# P1-8 Indonesian locale (the session uses it when present, see .xinitrc).
+sed -i -E 's/^# *(id_ID\.UTF-8 UTF-8)/\1/; s/^# *(en_US\.UTF-8 UTF-8)/\1/' /etc/locale.gen
+grep -q '^id_ID.UTF-8 UTF-8' /etc/locale.gen || echo 'id_ID.UTF-8 UTF-8' >> /etc/locale.gen
+locale-gen >/dev/null 2>&1 || echo "PERINGATAN: locale-gen gagal"
+# ---- DESIGN §24 P2 ----
+# P2-2 / P2-10: printers (CUPS: lpadmin group, no password) and Bluetooth for the atlas user.
+usermod -aG lpadmin,bluetooth "$ATLAS_USER" 2>/dev/null || true
+systemctl enable --now cups bluetooth >/dev/null 2>&1 || true
+# P3-8: the power button opens Atlas's power menu (Openbox forwards XF86PowerOff) instead of switching off at once;
+# closing the lid = sleep (xss-lock locks the screen when a PIN is set). Takes effect after the next reboot.
+install -d /etc/systemd/logind.conf.d
+cat > /etc/systemd/logind.conf.d/50-atlas-os.conf <<'EOF'
+# Atlas OS (DESIGN §24 P3-8)
+[Login]
+HandlePowerKey=ignore
+HandleLidSwitch=suspend
+HandleLidSwitchExternalPower=suspend
+EOF
+# P2-9: which app opens which file type (double-click in Berkas, "Atlas, buka file …").
+install -d "$H/.config"
+cat > "$H/.config/mimeapps.list" <<'EOF'
+[Default Applications]
+application/pdf=org.gnome.Evince.desktop
+application/msword=libreoffice-writer.desktop
+application/vnd.openxmlformats-officedocument.wordprocessingml.document=libreoffice-writer.desktop
+application/vnd.oasis.opendocument.text=libreoffice-writer.desktop
+application/rtf=libreoffice-writer.desktop
+application/vnd.ms-excel=libreoffice-calc.desktop
+application/vnd.openxmlformats-officedocument.spreadsheetml.sheet=libreoffice-calc.desktop
+application/vnd.oasis.opendocument.spreadsheet=libreoffice-calc.desktop
+text/csv=libreoffice-calc.desktop
+application/vnd.ms-powerpoint=libreoffice-impress.desktop
+application/vnd.openxmlformats-officedocument.presentationml.presentation=libreoffice-impress.desktop
+application/vnd.oasis.opendocument.presentation=libreoffice-impress.desktop
+image/png=org.xfce.ristretto.desktop
+image/jpeg=org.xfce.ristretto.desktop
+image/gif=org.xfce.ristretto.desktop
+image/webp=org.xfce.ristretto.desktop
+image/bmp=org.xfce.ristretto.desktop
+video/mp4=mpv.desktop
+video/x-matroska=mpv.desktop
+video/webm=mpv.desktop
+video/x-msvideo=mpv.desktop
+video/quicktime=mpv.desktop
+audio/mpeg=mpv.desktop
+audio/ogg=mpv.desktop
+audio/x-wav=mpv.desktop
+audio/mp4=mpv.desktop
+application/zip=xarchiver.desktop
+application/x-7z-compressed=xarchiver.desktop
+application/vnd.rar=xarchiver.desktop
+application/x-tar=xarchiver.desktop
+application/gzip=xarchiver.desktop
+text/plain=org.xfce.mousepad.desktop
+text/html=google-chrome.desktop
+x-scheme-handler/http=google-chrome.desktop
+x-scheme-handler/https=google-chrome.desktop
+inode/directory=pcmanfm.desktop
+EOF
 chown -R "$ATLAS_USER:$ATLAS_USER" "$H/.config" "$H/.local" "$H/.bash_profile" "$H/.xinitrc" "$H/atlas-data"
 systemctl daemon-reload
 
