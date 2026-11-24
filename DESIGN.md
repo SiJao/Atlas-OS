@@ -1,6 +1,6 @@
 # Atlas OS — Dokumen Desain
 
-**Versi:** 0.8
+**Versi:** 0.9
 **Tanggal:** 2026-11-24
 **Status:**
 - **Tahap 0 LULUS** di VirtualBox (§15): pengenalan suara Bahasa Indonesia jalan di Google Chrome Linux.
@@ -9,7 +9,8 @@
 - **Tahap 3 SELESAI** (§18): layar utama tata letak A (dipilih Hong Khai) sebagai mode kiosk `/?kiosk=1`; 281 tes Windows lulus, diuji dengan Chrome `--kiosk` di VM.
 - **Tahap 4 SELESAI** (§19): `stage4/install-atlas-os.sh` — dari Debian polos ke layar utama Atlas; diuji di VM bersih (menyala sendiri, hotkey, pemulihan, Wi-Fi API); RAM terpasang 715 MB diam, ± 780 MB saat mendengar / dengan LibreOffice.
 - **Tahap 5 SELESAI** (§20): pembaruan dari GitHub dengan izin (tombol + kartu), uji jalan, cadangan data, cek kesehatan, kembali otomatis; diuji di VM termasuk versi rusak; 292 tes Windows lulus.
-- Berikutnya: Tahap 6 (pengamanan & uji pakai harian, butuh laptop asli).
+- **Perbaikan uji coba Hong Khai SELESAI** (§21): tombol tanpa obrolan + popup gagal, daya langsung, panel Jaringan (kabel), Mode admin.
+- Berikutnya: tampilan desktop baru dari gambar Hong Khai (§22), lalu Tahap 6 (laptop asli).
 **Folder:** `C:\HISADA\atlas-os`. Proyek TERPISAH dari `C:\HISADA\atlas` dan tidak ikut repo `SiJao/atlas`.
 **Repo:** `SiJao/Atlas-OS` (**publik**, keputusan Hong Khai 2026-11-23). Unduhan besar di `stage0/downloads/` tidak ikut repo.
 **Hubungan:** Atlas yang sekarang dijelaskan di [../atlas/DESIGN.md](../atlas/DESIGN.md) dan [../atlas/SPEC.md](../atlas/SPEC.md). Dokumen ini hanya membahas cara Atlas berjalan sebagai "sistem operasi" di laptop kedua.
@@ -722,3 +723,70 @@ Repo uji lokal di VM dipakai untuk versi rusak, jadi tidak ada commit rusak yang
 7. "Cek pembaruan" dijawab dua kali. Kini sekali.
 
 **Catatan jujur:** commit Atlas `d297c60` sudah meng-import `./update.js` yang baru masuk di `104a980`, jadi `d297c60` sendirian tidak bisa dijalankan. Laptop 2 selalu memakai ujung `main` sehingga tidak berdampak. Riwayat tidak ditulis ulang, karena itu butuh force push.
+
+## 21. Perbaikan dari uji coba Hong Khai di VirtualBox (2026-11-24)
+
+**Keputusan Hong Khai:**
+1. Tombol **"Mode admin"** di Atlas: kolom sandi bertitik, lalu terminal admin terbuka.
+2. Menu daya: **langsung** tanpa kartu. Ucapan: tetap kartu, tetapi setelah "Ya" **langsung mati** (tanpa 60 dtk).
+3. Tombol: **tanpa tanda bila berhasil**. Bila **gagal atau crash**: **popup** "<aplikasi> gagal dijalankan: <alasan>".
+4. Panel **Jaringan** dengan LAN/kabel (disetujui tanpa pertanyaan).
+
+| No | Masukan | Penyebab | Usulan |
+|---|---|---|---|
+| 1 | **Login admin membingungkan**: tidak terlihat apakah nama pengguna benar atau sedang mengisi sandi | Terminal teks Linux (`Ctrl+Alt+F2`) memang tidak menampilkan apa pun saat sandi diketik; pesannya bahasa Inggris dan hurufnya kecil | [TANYA 1] |
+| 2 | **Jaringan**: tampilkan juga LAN/kabel atau jaringan virtual, bukan hanya Wi-Fi | Panel hanya membaca daftar Wi-Fi | Panel **"Jaringan"**: bagian *Kabel / LAN* (nama perangkat, tersambung atau tidak, alamat IP) di atas daftar Wi-Fi. Bar status menunjukkan jenis sambungan ("Kabel" / nama Wi-Fi / "Offline"). |
+| 3 | **Matikan / mulai ulang langsung**, tanpa menunggu 60 detik | Jeda 60 dtk ditiru dari Windows (`shutdown /t 60`) | Di Atlas OS: langsung. [TANYA 2] |
+| 4 | **Tombol & aksi tidak perlu masuk ke gelembung obrolan**, kecuali bila Hong Khai sendiri meminta (mengucapkan/mengetik) | Tombol dok, daya, dan pembaruan mengirim kalimat ("buka lembar kerja") lewat obrolan | Jalur baru **`/api/aksi`**: tombol menjalankan alat langsung, tetap lewat kartu izin bila perlu dan tetap tercatat di audit, tetapi **tidak** menulis pesan di obrolan. Hasilnya tampil sebentar sebagai baris kecil di bawah orb. Ucapan/ketikan tetap masuk obrolan seperti biasa. [TANYA 3] |
+
+Pertanyaan:
+1. **Login admin:**
+   - (a) layar login diberi petunjuk Bahasa Indonesia yang jelas, misalnya "ketik nama akun, Enter; ketik sandi — **hurufnya memang tidak tampil**, lalu Enter", plus huruf terminal lebih besar. Disarankan; perubahannya kecil.
+   - (b) tombol **"Mode admin"** di menu daya Atlas, dengan kolom sandi bertitik (●●●) di layar grafis.
+2. **Matikan/mulai ulang:**
+   - (a) dari **menu daya**: langsung tanpa kartu izin (memilih di menu sudah berupa konfirmasi); lewat **ucapan** "matikan laptop": tetap dengan kartu (untuk berjaga dari salah dengar). Disarankan.
+   - (b) keduanya langsung tanpa kartu.
+   - Atlas di Windows (laptop 1) tetap 60 detik.
+3. **Hasil tombol:**
+   - (a) baris kecil di bawah orb selama ± 4 dtk, misalnya "Lembar kerja dibuka" atau "Gagal: …". Disarankan.
+   - (b) tanpa tanda apa pun.
+
+## 22. Tampilan desktop baru dari gambar Hong Khai (2026-11-24, setelah §21)
+
+Rujukan: gambar buatan Gemini milik Hong Khai (`ui-reference/gemini-desktop.jpg`, lokal saja). Isinya: bar menu atas, wallpaper ombak dengan pusaran Debian, jendela "Tentang OS Ini", jendela Atlas mengambang (orb + obrolan + kolom ketik), dan dok ikon berwarna di bawah.
+
+**Keputusan Hong Khai:**
+1. Dikerjakan **setelah** 4 perbaikan §21.
+2. Bar atas & dok **selalu terlihat**. Aplikasi dibuka di ruang di antaranya (margin Openbox; layar Atlas di lapisan paling bawah).
+3. Atlas berupa **jendela sendiri** yang bisa dipanggil di atas aplikasi (Ctrl+Alt+Spasi / ikon Atlas di dok).
+5. **Notch Atlas** (seperti di Atlas Windows, §22 DESIGN Atlas) ikut dipakai, tetapi **lebih ringkas** supaya tidak memenuhi layar: pil kecil di tengah bar atas; saat dipanggil/mendengar/berbicara hanya turun sedikit (orb kecil + status + teks singkat), lalu naik lagi. (Permintaan Hong Khai 2026-11-24.)
+4. Bar menu: **menu Atlas saja + status**. Menu Atlas berisi Tentang OS Ini, Jaringan, Mode admin, Tidurkan, Mulai ulang, Matikan. Bagian kanan: Online, baterai, RAM, Versi baru, Wi-Fi, volume, tanggal & jam.
+
+**Penyesuaian dari gambar:**
+- logo Apple diganti logo Atlas;
+- ikon aplikasi digambar sendiri (bukan logo merek lain);
+- data "Tentang OS Ini" dibaca dari sistem (gambar menulis 3 GB/eMMC; Zyrex 4 GB/SSD).
+
+Alurnya sama seperti sebelumnya: prototipe Chrome → dipilih → dipasang.
+
+### 21.1 Hasil (2026-11-24)
+
+Atlas: `5caee18` (empat perbaikan), `bba071b` (kolom sandi & kabel unmanaged), `f230d80` (kegagalan daya jadi popup). Tes Windows 298/298 (kecuali `tutup_aplikasi` yang lambat saat VM berjalan; bagian itu tidak diubah).
+
+Diuji di VM dengan klik mouse sungguhan:
+
+| Uji | Hasil |
+|---|---|
+| Klik dok "Lembar kerja" | ✅ Calc terbuka; **tidak ada pesan baru di obrolan** |
+| Popup gagal | ✅ penampil PDF disembunyikan → klik dok PDF → popup "PDF gagal dijalankan — pdf belum terpasang" |
+| Panel Jaringan | ✅ bagian **Kabel / LAN** (`enp0s3`) di atas Wi-Fi; bar status "· Kabel" |
+| Mode admin | ✅ sandi tampil ●●●; salah → "Sandi salah."; benar → **terminal admin `atlasadmin`** (huruf besar); file sandi sekali-pakai terhapus; audit hanya mencatat berhasil/gagal |
+| Menu daya "Mulai ulang" | ✅ VM mati **6 dtk** setelah klik (tanpa 60 dtk, tanpa kartu), layar Atlas kembali sendiri |
+
+**Masalah yang ditemukan uji dan sudah diperbaiki:**
+1. **Chrome menawarkan menyimpan sandi admin.** Kolom sandi admin & Wi-Fi kini teks yang digambar sebagai titik (bukan `type=password`).
+2. **Kabel tampil "Tidak tersambung"**, karena kabel dari pemasang Debian dikelola `ifupdown`. Kini IP-nya dibaca dari kernel, dan pemasang membuat NetworkManager ikut mengelola kabel.
+3. **Mulai ulang/matikan tidak terjadi dan senyap.** `polkitd` tidak terpasang (`--no-install-recommends`), sehingga logind & NetworkManager menolak layanan Atlas. Kini pemasang memasang `polkitd` + aturan **khusus akun atlas, hanya daya & NetworkManager**; penolakan apa pun menjadi popup. (Bug ini juga mengenai panel Wi-Fi di laptop asli; kini ikut beres.)
+4. **Pengupdate memasang tawaran lama**, bukan versi terbaru. Kini selalu mengecek ulang sebelum memasang.
+
+Juga ditambahkan: petunjuk Bahasa Indonesia di layar login terminal (`/etc/issue`) sebagai cadangan Mode admin.

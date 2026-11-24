@@ -3,3 +3,5 @@
 stage4/files/atlas-kiosk text eol=lf
 *.cfg text eol=lf
 *.mjs text eol=lf
+stage4/files/admin-terminal.py text eol=lf
+*.py text eol=lf

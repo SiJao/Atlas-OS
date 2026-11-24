@@ -1,6 +1,6 @@
 # Atlas OS — Rangkuman
 
-**Per:** 2026-11-24 · **Rinci:** [DESIGN.md](DESIGN.md) (v0.8) · **Atlas sendiri:** repo private `SiJao/atlas` (SPEC.md)
+**Per:** 2026-11-24 · **Rinci:** [DESIGN.md](DESIGN.md) (v0.9) · **Atlas sendiri:** repo private `SiJao/atlas` (SPEC.md)
 
 ---
 
@@ -16,7 +16,7 @@ Laptop kedua yang saat dinyalakan **langsung masuk ke Atlas**, layar penuh, tanp
 | Dasar sistem | Debian 13 minimal + X11 + Openbox (tanpa desktop) |
 | Tampilan | Google Chrome layar penuh (kiosk) yang menampilkan layar utama Atlas |
 | Otak | tetap di awan: Gemini (depan) + Claude Code (belakang); data tetap di laptop |
-| Status | **Tahap 0–5 selesai** dan teruji di VirtualBox. **Tahap 6** (uji di laptop asli) menunggu laptop Zyrex |
+| Status | **Tahap 0–5 selesai** + perbaikan dari uji coba Hong Khai, teruji di VirtualBox. Berikutnya: **tampilan desktop baru** dari gambar Hong Khai (§22 DESIGN), lalu **Tahap 6** di laptop Zyrex |
 
 ## 2. Rancangan sistem
 
@@ -74,7 +74,7 @@ Kode Atlas dibagi dua (Tahap 1–2):
 | Kelompok | Fungsi |
 |---|---|
 | Bicara & dengar | panggil "Atlas" atau Ctrl+Alt+Spasi, jawab dengan suara (Gemini TTS Algenib), ketik juga bisa |
-| Laptop | info laptop, buka/tutup aplikasi, volume, kecerahan, kunci layar, matikan/mulai ulang/tidur (dengan kartu izin), **Wi-Fi** |
+| Laptop | info laptop, buka/tutup aplikasi, volume, kecerahan, kunci layar, matikan/mulai ulang/tidur (**langsung**; lewat ucapan dengan kartu izin), panel **Jaringan** (kabel/LAN + Wi-Fi), **Mode admin** |
 | File | cari, baca (teks & Office), salin, pindah, ganti nama, hapus ke tempat sampah, **undo** |
 | Pengingat & jadwal | pengingat berbunyi, ringkasan pagi, kalender & Gmail (setelah akun Google pulih) |
 | Memori | ingatan jangka panjang + memori graf (orang, proyek, janji) |
@@ -90,7 +90,10 @@ Kode Atlas dibagi dua (Tahap 1–2):
 - Akun **`atlas` tanpa sudo**, sandi terkunci (hanya login otomatis di layar). Akun admin terpisah untuk perawatan (`Ctrl+Alt+F2`).
 - **Aplikasi hanya dari daftar izin.** Openbox tanpa menu klik-kanan dan tanpa panel.
 - **Pagar Claude menyala:** Claude hanya menulis di folder kerja, tidak bisa naik hak; pola sudo/su/pkexec ditolak otomatis.
-- **Kartu izin menyala** untuk aksi yang mengubah sesuatu (termasuk daya dan pembaruan).
+- **Kartu izin menyala** untuk aksi yang mengubah sesuatu (termasuk pembaruan dan daya lewat ucapan). Menu daya di layar langsung dijalankan, karena memilihnya sudah merupakan konfirmasi.
+- **Tombol layar** (dok, daya, pembaruan) tidak menulis di obrolan. Berhasil tanpa tanda; gagal atau aplikasi crash → **popup**.
+- **Mode admin:** sandi diketik di kotak bertitik (●●●), diperiksa sistem, lalu terminal admin terbuka. Sandi tidak disimpan dan tidak dicatat; 3× salah → jeda 1 menit. Chrome tidak ditawari menyimpan sandi.
+- **polkit:** aturan khusus akun `atlas` hanya untuk daya dan jaringan, karena Atlas berjalan sebagai layanan latar.
 - **Usulan perbaikan diri mati** di laptop 2. Kode hanya datang dari laptop 1 lewat GitHub.
 - **Wi-Fi:** sandi tidak disimpan Atlas, tidak dicatat, dan tidak dikirim ke Gemini. Nama jaringan ditampilkan sebagai teks, bukan HTML.
 - **Kunci rahasia** dienkripsi `systemd-creds`, diisi di layar laptop 2, **tidak pernah disalin** dari laptop 1.
@@ -187,7 +190,7 @@ Kode Atlas dibagi dua (Tahap 1–2):
 | Apa | Di mana |
 |---|---|
 | Repo proyek ini | `SiJao/Atlas-OS` (publik) |
-| Desain lengkap | `DESIGN.md` (v0.8) |
+| Desain lengkap | `DESIGN.md` (v0.9) |
 | Rangkuman ini | `SUMMARY.md` |
 | Uji kelayakan (Tahap 0) | `stage0/` (STEPS.md, test.sh, voice-test.html, test-server.mjs, stage0-result.txt) |
 | Uji adaptor Linux (Tahap 2) | `stage2/` (provision-vm.sh, smoke-test.sh, real-check.mjs, atspi-diag.sh) |

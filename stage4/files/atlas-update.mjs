@@ -183,8 +183,8 @@ function pruneReleases(keep) {
 }
 
 async function pasang() {
-  let s = readState();
-  if (s.status !== 'tersedia') s = await cek();
+  // Always check again first: main may have moved on since the offer was shown (install the newest).
+  const s = await cek();
   if (s.status !== 'tersedia') { log('tidak ada versi baru'); return s; }
   const lama = currentSha();
   let sha = s.sha;

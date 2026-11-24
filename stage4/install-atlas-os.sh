@@ -56,11 +56,11 @@ VIDEO=(xserver-xorg-video-fbdev)
   xserver-xorg-core xserver-xorg-input-libinput "${VIDEO[@]}" xinit x11-xserver-utils xinput openbox \
   xdotool xprintidle imagemagick python3 python3-gi gir1.2-atspi-2.0 at-spi2-core dbus-user-session \
   pipewire pipewire-pulse pipewire-bin wireplumber pulseaudio-utils sound-theme-freedesktop \
-  network-manager brightnessctl libglib2.0-bin xdg-utils zram-tools \
+  network-manager polkitd brightnessctl libglib2.0-bin xdg-utils zram-tools \
   firmware-iwlwifi firmware-realtek firmware-atheros firmware-misc-nonfree \
   fonts-dejavu-core fonts-noto-core fonts-noto-color-emoji \
   google-chrome-stable libreoffice-writer libreoffice-calc libreoffice-impress libreoffice-gtk3 \
-  mpv evince pcmanfm code >/dev/null
+  mpv evince pcmanfm code xterm >/dev/null
 echo "terpasang: $(google-chrome --version), LibreOffice $(dpkg-query -W -f='${Version}' libreoffice-core 2>/dev/null), VS Code $(dpkg-query -W -f='${Version}' code)"
 
 langkah "4. Node.js $NODE_VERSION di /opt/node (checksum diperiksa)"
@@ -145,6 +145,23 @@ EOF
 install -m 755 "$HERE/files/atlas-kiosk" "$H/.local/bin/atlas-kiosk"
 install -d /opt/atlas-os && install -m 644 "$HERE/files/recovery-server.mjs" /opt/atlas-os/recovery-server.mjs
 install -m 644 "$HERE/files/atlas-update.mjs" /opt/atlas-os/atlas-update.mjs   # DESIGN §20
+# Mode admin (DESIGN §21): the admin = the account that ran this installer with sudo.
+install -m 755 "$HERE/files/admin-terminal.py" /opt/atlas-os/admin-terminal.py
+if [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "$ATLAS_USER" ] && [ "$SUDO_USER" != root ]; then
+  echo "$SUDO_USER" > /opt/atlas-os/admin-user
+elif [ ! -s /opt/atlas-os/admin-user ]; then
+  echo "PERINGATAN: akun admin tidak diketahui (jalankan pemasang lewat sudo dari akun admin); Mode admin belum aktif."
+fi
+chmod 644 /opt/atlas-os/admin-user 2>/dev/null || true
+# Text-console fallback (Ctrl+Alt+F2): clear Indonesian instructions on the login screen.
+cat > /etc/issue <<'EOF'
+
+  Atlas OS — terminal perawatan (Ctrl+Alt+F1 = kembali ke layar Atlas)
+  1. Ketik NAMA AKUN admin, tekan Enter.
+  2. Ketik SANDI, tekan Enter. Huruf sandi memang TIDAK tampil sama sekali di sini; itu normal.
+  Lebih mudah: menu Daya di layar Atlas -> "Mode admin" (sandi tampil sebagai titik).
+
+EOF
 
 langkah "7. Layanan Atlas (systemd --user) + halaman pemulihan"
 cat > "$H/.config/systemd/user/atlas.service" <<'EOF'
@@ -246,6 +263,26 @@ printf 'ALGO=zstd\nPERCENT=50\n' > /etc/default/zramswap
 systemctl enable --now zramswap >/dev/null 2>&1 || true
 if grep -q '^GRUB_TIMEOUT=' /etc/default/grub; then sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=1/' /etc/default/grub && update-grub >/dev/null 2>&1 || true; fi
 systemctl enable NetworkManager >/dev/null 2>&1 || true
+# Debian's installer sets up the cable with ifupdown, so NetworkManager would leave it "unmanaged" and Atlas's
+# network panel could not manage it. Let NetworkManager manage those interfaces too (takes effect after reboot).
+# Atlas runs as a background (systemd --user) service, which polkit does not count as an "active local session":
+# allow exactly power and NetworkManager actions for the atlas user (found in the VM test 2026-11-24).
+install -d /etc/polkit-1/rules.d
+cat > /etc/polkit-1/rules.d/50-atlas-os.rules <<EOF
+// Atlas OS (DESIGN §21): power + NetworkManager for the "$ATLAS_USER" user only, nothing else.
+polkit.addRule(function (action, subject) {
+  if (subject.user !== "$ATLAS_USER") return polkit.Result.NOT_HANDLED;
+  var power = ["org.freedesktop.login1.power-off", "org.freedesktop.login1.power-off-multiple-sessions",
+               "org.freedesktop.login1.reboot", "org.freedesktop.login1.reboot-multiple-sessions",
+               "org.freedesktop.login1.suspend", "org.freedesktop.login1.suspend-multiple-sessions"];
+  if (power.indexOf(action.id) >= 0) return polkit.Result.YES;
+  if (action.id.indexOf("org.freedesktop.NetworkManager.") === 0) return polkit.Result.YES;
+  return polkit.Result.NOT_HANDLED;
+});
+EOF
+systemctl restart polkit >/dev/null 2>&1 || true
+install -d /etc/NetworkManager/conf.d
+printf '[ifupdown]\nmanaged=true\n' > /etc/NetworkManager/conf.d/10-atlas-os-manage-all.conf
 chown -R "$ATLAS_USER:$ATLAS_USER" "$H/.config" "$H/.local" "$H/.bash_profile" "$H/.xinitrc" "$H/atlas-data"
 systemctl daemon-reload
 
