@@ -54,7 +54,7 @@ VIDEO=(xserver-xorg-video-fbdev)
 [ "$(systemd-detect-virt 2>/dev/null || true)" = "oracle" ] && VIDEO+=(xserver-xorg-video-vmware) # VirtualBox test VM
 "${APT[@]}" \
   xserver-xorg-core xserver-xorg-input-libinput "${VIDEO[@]}" xinit x11-xserver-utils xinput openbox \
-  xdotool xprintidle imagemagick python3 python3-gi gir1.2-atspi-2.0 at-spi2-core dbus-user-session \
+  xdotool wmctrl pciutils xprintidle imagemagick python3 python3-gi gir1.2-atspi-2.0 at-spi2-core dbus-user-session \
   pipewire pipewire-pulse pipewire-bin wireplumber pulseaudio-utils sound-theme-freedesktop \
   network-manager polkitd brightnessctl libglib2.0-bin xdg-utils zram-tools \
   firmware-iwlwifi firmware-realtek firmware-atheros firmware-misc-nonfree \
@@ -116,13 +116,17 @@ xset s off; xset s noblank; xset dpms 0 0 900    # no screensaver; screen off af
 "$HOME/.local/bin/atlas-kiosk" &
 EOF
 # Openbox: no desktop menu, no panel; only Atlas's hotkey, Alt+Tab between open apps, and Alt+F4.
+# Desktop (DESIGN §22.3): margins keep the Atlas top bar (34 px) and dock (84 px) visible; maximized apps fit
+# between them. The desktop window (Chrome app on http://localhost:4950/desktop, WM_CLASS "localhost__desktop") stays undecorated
+# in the bottom layer. Keep the margins in sync with web/desktop.css in Atlas.
 cat > "$H/.config/openbox/rc.xml" <<'EOF'
 <?xml version="1.0" encoding="UTF-8"?>
 <openbox_config xmlns="http://openbox.org/3.4/rc">
   <focus><focusNew>yes</focusNew><followMouse>no</followMouse></focus>
   <placement><policy>Smart</policy><center>yes</center></placement>
-  <theme><name>Clearlooks</name><titleLayout>LC</titleLayout></theme>
+  <theme><name>Clearlooks</name><titleLayout>LIMC</titleLayout></theme>
   <desktops><number>1</number></desktops>
+  <margins><top>34</top><bottom>84</bottom><left>0</left><right>0</right></margins>
   <keyboard>
     <keybind key="C-A-space"><action name="Execute"><command>sh -c 'echo HOTKEY &gt; "$XDG_RUNTIME_DIR/atlas-hotkey"'</command></action></keybind>
     <keybind key="A-Tab"><action name="NextWindow"/></keybind>
@@ -139,6 +143,8 @@ cat > "$H/.config/openbox/rc.xml" <<'EOF'
   </mouse>
   <applications>
     <application class="*"><maximized>yes</maximized></application>
+    <application name="localhost__desktop"><maximized>no</maximized><decor>no</decor><layer>below</layer><focus>no</focus>
+      <skip_taskbar>yes</skip_taskbar><skip_pager>yes</skip_pager><position force="yes"><x>0</x><y>0</y></position></application>
   </applications>
 </openbox_config>
 EOF
@@ -269,7 +275,7 @@ systemctl enable NetworkManager >/dev/null 2>&1 || true
 # allow exactly power and NetworkManager actions for the atlas user (found in the VM test 2026-11-24).
 install -d /etc/polkit-1/rules.d
 cat > /etc/polkit-1/rules.d/50-atlas-os.rules <<EOF
-// Atlas OS (DESIGN §21): power + NetworkManager for the "$ATLAS_USER" user only, nothing else.
+// Atlas OS (DESIGN §21, §22.2): power, NetworkManager, time zone/NTP for the "$ATLAS_USER" user only, nothing else.
 polkit.addRule(function (action, subject) {
   if (subject.user !== "$ATLAS_USER") return polkit.Result.NOT_HANDLED;
   var power = ["org.freedesktop.login1.power-off", "org.freedesktop.login1.power-off-multiple-sessions",
@@ -277,10 +283,21 @@ polkit.addRule(function (action, subject) {
                "org.freedesktop.login1.suspend", "org.freedesktop.login1.suspend-multiple-sessions"];
   if (power.indexOf(action.id) >= 0) return polkit.Result.YES;
   if (action.id.indexOf("org.freedesktop.NetworkManager.") === 0) return polkit.Result.YES;
+  // Settings window (DESIGN §22.2): time zone and automatic time only (not setting the clock by hand).
+  if (action.id === "org.freedesktop.timedate1.set-timezone" || action.id === "org.freedesktop.timedate1.set-ntp") return polkit.Result.YES;
   return polkit.Result.NOT_HANDLED;
 });
 EOF
 systemctl restart polkit >/dev/null 2>&1 || true
+# Chrome policy (DESIGN §22.3): microphone allowed without asking for Atlas's own pages only. Replaces the
+# --use-fake-ui-for-media-stream flag, which shows a warning bar now that Chrome no longer runs in --kiosk.
+install -d /etc/opt/chrome/policies/managed
+cat > /etc/opt/chrome/policies/managed/atlas-os.json <<'EOF'
+{
+  "AudioCaptureAllowedUrls": ["http://127.0.0.1:4950", "http://localhost:4950"],
+  "AutoplayAllowlist": ["http://127.0.0.1:4950", "http://localhost:4950"]
+}
+EOF
 install -d /etc/NetworkManager/conf.d
 printf '[ifupdown]\nmanaged=true\n' > /etc/NetworkManager/conf.d/10-atlas-os-manage-all.conf
 chown -R "$ATLAS_USER:$ATLAS_USER" "$H/.config" "$H/.local" "$H/.bash_profile" "$H/.xinitrc" "$H/atlas-data"

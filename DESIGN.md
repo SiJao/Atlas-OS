@@ -1,6 +1,6 @@
 # Atlas OS — Dokumen Desain
 
-**Versi:** 0.9
+**Versi:** 1.0
 **Tanggal:** 2026-11-24
 **Status:**
 - **Tahap 0 LULUS** di VirtualBox (§15): pengenalan suara Bahasa Indonesia jalan di Google Chrome Linux.
@@ -10,7 +10,8 @@
 - **Tahap 4 SELESAI** (§19): `stage4/install-atlas-os.sh` — dari Debian polos ke layar utama Atlas; diuji di VM bersih (menyala sendiri, hotkey, pemulihan, Wi-Fi API); RAM terpasang 715 MB diam, ± 780 MB saat mendengar / dengan LibreOffice.
 - **Tahap 5 SELESAI** (§20): pembaruan dari GitHub dengan izin (tombol + kartu), uji jalan, cadangan data, cek kesehatan, kembali otomatis; diuji di VM termasuk versi rusak; 292 tes Windows lulus.
 - **Perbaikan uji coba Hong Khai SELESAI** (§21): tombol tanpa obrolan + popup gagal, daya langsung, panel Jaringan (kabel), Mode admin.
-- Berikutnya: tampilan desktop baru dari gambar Hong Khai (§22), lalu Tahap 6 (laptop asli).
+- **Desktop baru + Pengaturan SELESAI** (§22): bar menu Atlas, notch ringkas, dok, jendela Atlas mengambang, Pengaturan 11 kategori; diuji di VM; 310 tes Windows lulus.
+- Berikutnya: Tahap 6 (laptop asli).
 **Folder:** `C:\HISADA\atlas-os`. Proyek TERPISAH dari `C:\HISADA\atlas` dan tidak ikut repo `SiJao/atlas`.
 **Repo:** `SiJao/Atlas-OS` (**publik**, keputusan Hong Khai 2026-11-23). Unduhan besar di `stage0/downloads/` tidak ikut repo.
 **Hubungan:** Atlas yang sekarang dijelaskan di [../atlas/DESIGN.md](../atlas/DESIGN.md) dan [../atlas/SPEC.md](../atlas/SPEC.md). Dokumen ini hanya membahas cara Atlas berjalan sebagai "sistem operasi" di laptop kedua.
@@ -751,24 +752,6 @@ Pertanyaan:
    - (a) baris kecil di bawah orb selama ± 4 dtk, misalnya "Lembar kerja dibuka" atau "Gagal: …". Disarankan.
    - (b) tanpa tanda apa pun.
 
-## 22. Tampilan desktop baru dari gambar Hong Khai (2026-11-24, setelah §21)
-
-Rujukan: gambar buatan Gemini milik Hong Khai (`ui-reference/gemini-desktop.jpg`, lokal saja). Isinya: bar menu atas, wallpaper ombak dengan pusaran Debian, jendela "Tentang OS Ini", jendela Atlas mengambang (orb + obrolan + kolom ketik), dan dok ikon berwarna di bawah.
-
-**Keputusan Hong Khai:**
-1. Dikerjakan **setelah** 4 perbaikan §21.
-2. Bar atas & dok **selalu terlihat**. Aplikasi dibuka di ruang di antaranya (margin Openbox; layar Atlas di lapisan paling bawah).
-3. Atlas berupa **jendela sendiri** yang bisa dipanggil di atas aplikasi (Ctrl+Alt+Spasi / ikon Atlas di dok).
-5. **Notch Atlas** (seperti di Atlas Windows, §22 DESIGN Atlas) ikut dipakai, tetapi **lebih ringkas** supaya tidak memenuhi layar: pil kecil di tengah bar atas; saat dipanggil/mendengar/berbicara hanya turun sedikit (orb kecil + status + teks singkat), lalu naik lagi. (Permintaan Hong Khai 2026-11-24.)
-4. Bar menu: **menu Atlas saja + status**. Menu Atlas berisi Tentang OS Ini, Jaringan, Mode admin, Tidurkan, Mulai ulang, Matikan. Bagian kanan: Online, baterai, RAM, Versi baru, Wi-Fi, volume, tanggal & jam.
-
-**Penyesuaian dari gambar:**
-- logo Apple diganti logo Atlas;
-- ikon aplikasi digambar sendiri (bukan logo merek lain);
-- data "Tentang OS Ini" dibaca dari sistem (gambar menulis 3 GB/eMMC; Zyrex 4 GB/SSD).
-
-Alurnya sama seperti sebelumnya: prototipe Chrome → dipilih → dipasang.
-
 ### 21.1 Hasil (2026-11-24)
 
 Atlas: `5caee18` (empat perbaikan), `bba071b` (kolom sandi & kabel unmanaged), `f230d80` (kegagalan daya jadi popup). Tes Windows 298/298 (kecuali `tutup_aplikasi` yang lambat saat VM berjalan; bagian itu tidak diubah).
@@ -790,3 +773,110 @@ Diuji di VM dengan klik mouse sungguhan:
 4. **Pengupdate memasang tawaran lama**, bukan versi terbaru. Kini selalu mengecek ulang sebelum memasang.
 
 Juga ditambahkan: petunjuk Bahasa Indonesia di layar login terminal (`/etc/issue`) sebagai cadangan Mode admin.
+
+## 22. Tampilan desktop baru dari gambar Hong Khai (2026-11-24, setelah §21)
+
+Rujukan: gambar buatan Gemini milik Hong Khai (`ui-reference/gemini-desktop.jpg`, lokal saja). Isinya: bar menu atas, wallpaper ombak dengan pusaran Debian, jendela "Tentang OS Ini", jendela Atlas mengambang (orb + obrolan + kolom ketik), dan dok ikon berwarna di bawah.
+
+**Keputusan Hong Khai:**
+1. Dikerjakan **setelah** 4 perbaikan §21.
+2. Bar atas & dok **selalu terlihat**. Aplikasi dibuka di ruang di antaranya (margin Openbox; layar Atlas di lapisan paling bawah).
+3. Atlas berupa **jendela sendiri** yang bisa dipanggil di atas aplikasi (Ctrl+Alt+Spasi / ikon Atlas di dok).
+5. **Notch Atlas** (seperti di Atlas Windows, §22 DESIGN Atlas) ikut dipakai, tetapi **lebih ringkas** supaya tidak memenuhi layar: pil kecil di tengah bar atas; saat dipanggil/mendengar/berbicara hanya turun sedikit (orb kecil + status + teks singkat), lalu naik lagi. (Permintaan Hong Khai 2026-11-24.)
+4. Bar menu: **menu Atlas saja + status**. Menu Atlas berisi Tentang OS Ini, Jaringan, Mode admin, Tidurkan, Mulai ulang, Matikan. Bagian kanan: Online, baterai, RAM, Versi baru, Wi-Fi, volume, tanggal & jam.
+
+**Penyesuaian dari gambar:**
+- logo Apple diganti logo Atlas;
+- ikon aplikasi digambar sendiri (bukan logo merek lain);
+- data "Tentang OS Ini" dibaca dari sistem (gambar menulis 3 GB/eMMC; Zyrex 4 GB/SSD).
+
+Alurnya sama seperti sebelumnya: prototipe Chrome → dipilih → dipasang.
+
+### 22.1 Prototipe (2026-11-24)
+
+`desktop-ui/desktop-prototype.html` (dibuka di Chrome; tombol tinjau di bawah layar memperlihatkan semua keadaan). Isinya:
+- **bar atas:** logo Atlas + menu (Tentang OS Ini, Pengaturan…, Jaringan…, Mode admin…, Tidurkan, Mulai ulang, Matikan); kanan: Online · Kabel, baterai, RAM, Versi baru, Wi-Fi, volume, tanggal & jam;
+- **notch ringkas:** pil 150×30 di tengah bar. Turun menjadi 380×64 hanya bila Atlas sedang mendengar/berpikir/berbicara **dan** jendelanya tersembunyi;
+- **wallpaper:** ombak biru-ungu + pusaran (digambar sendiri, bukan logo Debian);
+- **dok:** ikon sendiri (Browser, Dokumen, Lembar kerja, Presentasi, Kode, Video, PDF, Berkas, **Pengaturan** | Atlas, Sampah); titik di bawah ikon = aplikasi sedang terbuka;
+- **jendela Atlas** mengambang (orb + obrolan + kolom ketik);
+- **Pengaturan**.
+
+### 22.2 Pengaturan (permintaan Hong Khai 2026-11-24, "seperti Windows dan OS lain")
+
+Jendela sendiri: daftar kategori di kiri (dengan kotak cari), isi di kanan. Isinya dibaca dari sistem dan diubah lewat alat Linux biasa, **tanpa sudo**. Yang butuh root hanya ditampilkan dengan keterangan "lewat Mode admin".
+
+| Kategori | Isi | Alat Linux |
+|---|---|---|
+| Sistem | nama perangkat, OS, versi Atlas, prosesor, memori, grafis, disk, suhu, lama menyala | `/etc/os-release`, `/proc/cpuinfo`, `os`, `lspci`, `df`, `/sys/class/thermal` |
+| Layar | kecerahan (geser), lampu malam, resolusi (dibaca), matikan layar setelah … | `brightnessctl`, `xrandr --gamma`, `xrandr`, `xset dpms` |
+| Suara | volume & bisu, perangkat keluaran, mikrofon & volumenya | `wpctl` |
+| Jaringan & Internet | kabel/LAN, Wi-Fi nyala/mati, daftar Wi-Fi + sambung | `nmcli` (sudah ada, §19/§21) |
+| Baterai & Daya | persen, status, kesehatan, tidur otomatis setelah … menit (pakai baterai / dicas) | `/sys/class/power_supply`, waktu diam dari `xprintidle`, `systemctl suspend` |
+| Penyimpanan | pemakaian disk, Tempat Sampah (kosongkan) | `df`, `du`, `gio trash --empty` |
+| Tanggal & Waktu | waktu otomatis (NTP), zona waktu (WIB/WITA/WIT + semua) | `timedatectl` (aturan polkit baru: **hanya** zona waktu & NTP) |
+| Aplikasi | daftar aplikasi yang diizinkan & perintahnya (dibaca) | daftar izin Atlas |
+| Atlas | versi, pintasan, suara jawaban, kartu izin, pagar (dibaca) | pengaturan Atlas |
+| Pembaruan | versi terpasang, cek sekarang, kembali ke versi sebelumnya | §20 (tetap lewat kartu izin) |
+| Keamanan | kunci layar sekarang, Mode admin | §21 |
+
+Pilihan yang disimpan (lampu malam, matikan layar, tidur otomatis) ditaruh di `data/system-settings.json` dan dipasang ulang setiap Atlas menyala.
+
+Tidak dimasukkan (butuh root atau berisiko mengunci layar): ganti nama perangkat, ubah resolusi, aksi tutup laptop, Bluetooth (belum terpasang). Semua bisa lewat Mode admin.
+
+### 22.3 Susunan jendela (hasil uji VM 2026-11-24)
+
+Dua temuan dari uji di VM:
+1. Chrome yang dibuka dengan `--kiosk` membuat **semua** jendelanya layar penuh. Karena itu Chrome kini dibuka **tanpa** `--kiosk`.
+2. Saat Openbox memasang aturan jendela, judul halaman belum ada (masih `127.0.0.1_/`). Yang bisa dibedakan hanya `WM_CLASS`, yang dibuat Chrome dari **host + jalur** (`localhost__desktop`, `127.0.0.1__settings`, `127.0.0.1` untuk `/?window=1`).
+
+Susunannya (satu Chrome, profil yang sama):
+
+| Jendela | Alamat | Diatur oleh |
+|---|---|---|
+| Desktop (wallpaper + bar + notch + dok) | `http://localhost:4950/desktop` | aturan Openbox `name="localhost__desktop"`: tanpa bingkai, lapisan **bawah**, tidak di Alt+Tab; ukurannya disamakan dengan layar oleh `atlas-kiosk` |
+| Jendela Atlas | `http://127.0.0.1:4950/?window=1` | Atlas sendiri (`wmctrl`): ± 440 px di kanan, di antara bar dan dok; disembunyikan = diminimalkan |
+| Pengaturan | `http://127.0.0.1:4950/settings` | aturan biasa: dimaksimalkan di antara bar dan dok |
+| Aplikasi lain | — | dimaksimalkan di antara bar & dok |
+
+- **Margin Openbox:** atas 34 px (bar), bawah 84 px (dok). Ukuran ini cocok untuk layar Zyrex 1366×768.
+- **Memanggil Atlas:** Ctrl+Alt+Spasi atau ikon Atlas di dok → jendela Atlas muncul di depan dan mikrofon menyala. Kartu izin yang datang saat jendela tersembunyi juga memunculkannya.
+- **Menu & popup desktop** (menu Atlas, popup "gagal dijalankan"): selama terbuka, jendela desktop **naik sementara** ke depan; setelah ditutup turun lagi. Ikon Wi-Fi/volume/baterai di bar membuka halaman Pengaturan yang sesuai, jadi tidak perlu popup.
+- **Notch:** Atlas mengirim keadaan jendelanya (terlihat/tersembunyi, mendengar) ke desktop lewat server (SSE).
+- Bila jendela Atlas atau desktop tertutup (Alt+F4), `atlas-kiosk` membukanya lagi.
+- Halaman pemulihan (§19.3) tetap layar penuh seperti sebelumnya.
+- Atlas di Windows (laptop 1) tidak berubah; semua ini hanya aktif bila `ATLAS_KIOSK=1` di Linux.
+
+### 22.4 Plus / minus
+
+- ➕ Aplikasi tidak menutupi bar & dok; Atlas tetap dipanggil dengan satu tombol; Pengaturan tanpa terminal.
+- ➖ Satu jendela Chrome tambahan (± 60–80 MB RAM). Saat menu desktop terbuka, aplikasi tertutup sementara.
+
+### 22.5 Hasil (2026-11-24)
+
+Atlas `7afd7dd`. Tes Windows 310/310 (termasuk 12 tes baru `tests/settings.test.mjs`). Diuji di VM `AtlasOS-Install` (1280×800) dengan klik mouse sungguhan; tangkapan layar ada di `desktop-ui/vm-screens/`.
+
+| Uji | Hasil |
+|---|---|
+| Menyala | ✅ desktop (bawah, tanpa bingkai, selebar layar) + jendela Atlas mengambang di kanan, di antara bar & dok |
+| Ikon Pengaturan di dok | ✅ jendela Pengaturan, dimaksimalkan di antara bar & dok; data asli VM (Celeron N4020, 2,9 GB, VMware SVGA, Debian 13) |
+| Ubah lewat Pengaturan | ✅ zona waktu WITA → WIB (polkit), volume 55 %, lampu malam, matikan layar 10 menit (`xset`); kecerahan ditolak dengan pesan (VM tanpa lampu latar); kunci asing ditolak |
+| Menu Atlas di bar | ✅ desktop naik sementara, menu tampil; klik di luar → turun lagi |
+| Dok "Lembar kerja" | ✅ Calc dimaksimalkan di antara bar & dok; titik di bawah ikon |
+| Ctrl+Alt+Spasi | ✅ jendela Atlas ke depan (di atas Calc), "Mendengarkan…" |
+| Notch | ✅ Atlas sibuk + jendela tersembunyi → pil melebar di dalam bar ("Sedang berpikir… membaca pengingat & kalender") |
+| Atlas dimulai ulang | ✅ berhenti 1 dtk; Calc tetap terbuka |
+| RAM | 0,6–0,8 GB terpakai (desktop + jendela Atlas + Pengaturan [+ Calc]) |
+
+**Masalah yang ditemukan uji dan sudah diperbaiki:**
+1. **Nama jendela Chrome** = host + jalur (`localhost__desktop`, `127.0.0.1__settings`), bukan host saja. Aturan Openbox dan pencarian jendela disesuaikan.
+2. **Bar peringatan Chrome** ("unsupported command-line flag") muncul setelah `--kiosk` dibuang. Flag mikrofon diganti kebijakan Chrome `/etc/opt/chrome/policies/managed/atlas-os.json`: mikrofon & suara otomatis **hanya** untuk alamat Atlas.
+3. **Gelembung Google Translate** di desktop. Halaman Atlas kini ditandai `notranslate`.
+4. **`atlas-kiosk` macet** karena Chrome dibuka di depan sebelum siap. Kini semua peluncuran di latar, dan jendela Atlas baru dibuka setelah desktop ada.
+5. **Aplikasi ikut mati saat Atlas dimulai ulang** (cgroup layanan): Calc yang belum disimpan hilang. Kini setiap aplikasi dijalankan di scope systemd sendiri (`systemd-run --user --scope`). Bug ini sudah ada sejak Tahap 2 dan juga mengenai pembaruan Atlas.
+6. **Stop Atlas macet 90 dtk** karena sambungan SSE desktop/Pengaturan & keep-alive tidak ditutup. Kini ditutup semua, dengan jaring pengaman keluar setelah 5 dtk.
+7. **Kecerahan membaca LED Scroll Lock** saat tidak ada lampu latar. Kini hanya kelas `backlight`. Bug lama ini juga mengenai "Atlas, terangkan layar".
+8. **Titik dok**: LibreOffice menaruh jenis aplikasinya di kelas (`libreoffice.libreoffice-calc`), dan jendela Atlas sendiri juga Chrome. Pencocokan diperbaiki.
+9. **Bingkai jendela Atlas menimpa bar**: `wmctrl` menaruh isi jendela, sedangkan bar judul Openbox ada di atasnya. Posisi kini memperhitungkan bar judul.
+
+**Belum diuji di VM:** suara mikrofon sungguhan & notch saat benar-benar berbicara (butuh kunci Gemini), suspend otomatis, kunci Wi-Fi asli. Semuanya untuk Tahap 6 (laptop asli).

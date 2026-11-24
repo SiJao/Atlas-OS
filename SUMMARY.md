@@ -16,7 +16,7 @@ Laptop kedua yang saat dinyalakan **langsung masuk ke Atlas**, layar penuh, tanp
 | Dasar sistem | Debian 13 minimal + X11 + Openbox (tanpa desktop) |
 | Tampilan | Google Chrome layar penuh (kiosk) yang menampilkan layar utama Atlas |
 | Otak | tetap di awan: Gemini (depan) + Claude Code (belakang); data tetap di laptop |
-| Status | **Tahap 0–5 selesai** + perbaikan dari uji coba Hong Khai, teruji di VirtualBox. Berikutnya: **tampilan desktop baru** dari gambar Hong Khai (§22 DESIGN), lalu **Tahap 6** di laptop Zyrex |
+| Status | **Tahap 0–5 selesai** + perbaikan dari uji coba Hong Khai + **desktop baru & Pengaturan** (§22), teruji di VirtualBox. Berikutnya: **Tahap 6** di laptop Zyrex |
 
 ## 2. Rancangan sistem
 
@@ -61,7 +61,17 @@ Kode Atlas dibagi dua (Tahap 1–2):
 | Wi-Fi | menu Windows | panel Wi-Fi Atlas (NetworkManager) |
 | Pengaman Claude | blok RunAs/gsudo | blok sudo/su/pkexec/doas, pola bahaya bash |
 
-## 3. Layar utama (Tahap 3, tata letak A "Pusat" pilihan Hong Khai)
+## 3. Desktop Atlas OS (§22, dari gambar Hong Khai)
+
+- **Bar atas** (34 px): logo + menu **Atlas** (Tentang OS Ini, Pengaturan, Jaringan, Mode admin, Tidurkan, Mulai ulang, Matikan); kanan: Online · Kabel/Wi-Fi, baterai, RAM, **Versi baru**, ikon Wi-Fi & suara (membuka Pengaturan), tanggal & jam.
+- **Notch ringkas** di tengah bar: pil kecil; melebar di dalam bar hanya saat Atlas sibuk dan jendelanya tersembunyi.
+- **Dok** (84 px), ikon gambar sendiri: Browser, Dokumen, Lembar kerja, Presentasi, Kode, Video, PDF, Berkas, **Pengaturan** | Atlas, Sampah. Titik = aplikasi terbuka; klik lagi = ke depan.
+- **Jendela Atlas** mengambang di kanan (orb + obrolan + kolom ketik); dipanggil dengan Ctrl+Alt+Spasi / ikon Atlas, muncul sendiri saat ada kartu izin.
+- **Pengaturan**: Sistem, Layar, Suara, Jaringan & Internet, Baterai & Daya, Penyimpanan, Tanggal & Waktu, Aplikasi, Atlas, Pembaruan, Keamanan. Data dibaca dari sistem; perubahan tanpa sudo (zona waktu lewat aturan polkit khusus).
+- Aplikasi dibuka dimaksimalkan **di antara bar dan dok** (margin Openbox), jadi bar & dok selalu terlihat.
+- Susunan teknis: satu Chrome tanpa `--kiosk`. Desktop ada di `localhost:4950/desktop` (lapisan bawah), jendela Atlas di `127.0.0.1:4950/?window=1`, Pengaturan di `/settings`. Mikrofon diizinkan lewat kebijakan Chrome, hanya untuk alamat Atlas.
+
+### Layar utama lama (Tahap 3, tata letak A "Pusat"); kini hanya dipakai sebagai susunan jendela Atlas
 
 - Kiri atas: **jam & tanggal**. Kiri: kartu **"Hari ini"** (pengingat hari ini).
 - Tengah: **orb** Atlas dan status ("Ucapkan "Atlas"…", Mendengarkan, Berpikir, Berbicara, Claude bekerja).
@@ -139,6 +149,8 @@ Kode Atlas dibagi dua (Tahap 1–2):
 | Tahap 4 | Panel Wi-Fi di layar Atlas; deploy key hanya-baca (dipasang lewat API); uji di VM baru bersih |
 | Tahap 5 | Gerbang = uji jalan; cek saat menyala + tiap 6 jam; cadangan data 3 terakhir |
 | Penamaan | Nama file & isi kode baru dalam bahasa Inggris |
+| Uji coba §21 | Tombol "Mode admin" bersandi titik; menu daya langsung (ucapan tetap kartu); tombol tanpa obrolan, gagal = popup; panel Jaringan dengan kabel |
+| Desktop §22 | Dari gambar Gemini Hong Khai: bar menu Atlas + status, notch ringkas, wallpaper, ikon sendiri; bar & dok selalu terlihat; Atlas = jendela sendiri; ditambah **Pengaturan** seperti Windows |
 | Repo Atlas OS | `SiJao/Atlas-OS`, **publik** (kode Atlas tetap di repo private) |
 
 ## 9. Tahapan
@@ -151,6 +163,7 @@ Kode Atlas dibagi dua (Tahap 1–2):
 | 3 | Layar utama layar penuh | ✅ **Selesai**: tata letak A, mode kiosk `/?kiosk=1`, diuji dengan Chrome `--kiosk` |
 | 4 | Skrip pemasang Debian → Atlas OS, ukur RAM | ✅ **Selesai**: VM bersih menyala sendiri ke Atlas; RAM 715 MB diam |
 | 5 | Alur update + rollback | ✅ **Selesai**: update sungguhan dari GitHub, versi rusak, kembali otomatis, alur dari layar |
+| §21–22 | Perbaikan uji coba + desktop baru + Pengaturan | ✅ **Selesai**: diuji di VM dengan klik sungguhan (Atlas `7afd7dd`) |
 | 6 | Uji di laptop asli & pakai harian | ⏳ menunggu laptop Zyrex |
 
 ### Hasil penting
@@ -167,7 +180,8 @@ Kode Atlas dibagi dua (Tahap 1–2):
   Dengan RAM 4 GB di Zyrex, sisa ± 3 GB saat diam. Angka ± 2 GB di Tahap 0 ternyata akibat sistem live.
 - **Pemasang (Tahap 4):** ± 7 menit pertama kali, 21 dtk saat diulang. Dari Debian polos (245 MB, 329 paket) sampai layar Atlas tanpa disentuh.
 - **Pembaruan (Tahap 5):** update dari GitHub 68 dtk; versi rusak dihentikan uji jalan; versi yang mati setelah 25 dtk dikembalikan otomatis dalam ± 35 dtk.
-- **Tes Atlas di Windows:** 292/292 lulus. Tampilan notch Windows tidak berubah.
+- **Desktop §22 (VM):** RAM 0,6–0,8 GB terpakai dengan desktop + jendela Atlas + Pengaturan (+ Calc); Atlas dimulai ulang dalam 1 dtk tanpa menutup aplikasi yang terbuka.
+- **Tes Atlas di Windows:** 310/310 lulus. Tampilan notch Windows tidak berubah.
 - **Bug yang ditemukan uji VM dan sudah diperbaiki:** ± 25. Contohnya:
   - AT-SPI macet di lembar Calc;
   - pembaca hotkey tertinggal setelah Atlas mati;

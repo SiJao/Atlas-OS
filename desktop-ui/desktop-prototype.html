@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="google" content="notranslate">
+<title>Atlas OS — Desktop</title>
+<!--
+  Atlas OS §22 prototype: the desktop from Hong Khai's Gemini image (bar menu, wallpaper, "Tentang OS Ini",
+  floating Atlas window, dock) + a COMPACT notch in the top bar (his request). Own logo & icons (no brand logos).
+  Uses Atlas's real orb: ../../atlas/web/orb.js (keep the Atlas folder next to atlas-os).
+  Review keys: Q/W/E/R = diam/dengar/pikir/bicara · A = jendela Atlas tampil/sembunyi · X = contoh aplikasi · T = Tentang OS Ini
+-->
+<style>
+  :root {
+    --teks: #EEF2F8; --redup: #A9B4C6; --aksen: #38BDF8; --aksen-muda: #7DD3FC; --emas: #F5C66B;
+    --kaca: rgba(42, 50, 72, .62); --kaca-gelap: rgba(22, 27, 40, .78); --garis: rgba(255, 255, 255, .12);
+    font-family: "Segoe UI", "Inter", "DejaVu Sans", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #05070d; overflow: hidden; color: var(--teks); }
+  #layar { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: center; overflow: hidden; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+
+  /* ---------- wallpaper: night waves with golden rims ---------- */
+  .wallpaper { position: absolute; inset: 0; background: radial-gradient(1400px 900px at 55% 40%, #1d2b5c 0%, #121b3d 45%, #0a1028 100%); }
+  .wallpaper svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .pusaran { position: absolute; left: 50%; top: 47%; width: 380px; height: 380px; transform: translate(-50%, -50%); opacity: .5; }
+
+  /* ---------- top bar ---------- */
+  .bar { position: absolute; left: 0; right: 0; top: 0; height: 40px; display: flex; align-items: center; padding: 0 18px; gap: 26px; font-size: 17px;
+    background: rgba(18, 24, 42, .55); backdrop-filter: blur(18px); border-bottom: 1px solid rgba(255,255,255,.06); z-index: 20; }
+  .bar .logo { width: 26px; height: 26px; }
+  .bar .menu-atlas { display: flex; align-items: center; gap: 10px; font-weight: 700; padding: 4px 10px; border-radius: 8px; }
+  .bar .menu-atlas:hover, .bar .menu-atlas.buka { background: rgba(255,255,255,.12); }
+  .bar .kanan { margin-left: auto; display: flex; align-items: center; gap: 16px; color: #dfe6f2; }
+  .bar .kanan span { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .titik { width: 9px; height: 9px; border-radius: 50%; background: #86EFAC; display: inline-block; }
+  .versi-baru { padding: 2px 12px; border-radius: 999px; border: 1px solid rgba(125,211,252,.7); color: var(--aksen-muda); font-size: 16px; }
+  .ikon-bar { width: 22px; height: 22px; stroke: #e7ecf5; fill: none; stroke-width: 2; stroke-linecap: round; }
+
+  /* dropdown "Atlas" */
+  .dropdown { position: absolute; left: 14px; top: 44px; width: 330px; padding: 8px; border-radius: 14px; background: var(--kaca-gelap);
+    backdrop-filter: blur(22px); border: 1px solid var(--garis); box-shadow: 0 20px 60px rgba(0,0,0,.45); z-index: 30; display: none; font-size: 19px; }
+  .dropdown.buka { display: block; }
+  .dropdown button { display: flex; width: 100%; padding: 9px 14px; border-radius: 8px; text-align: left; }
+  .dropdown button:hover { background: #2f6fd6; }
+  .dropdown hr { border: 0; border-top: 1px solid var(--garis); margin: 6px 8px; }
+
+  /* ---------- compact notch (center of the bar) ---------- */
+  .notch { position: absolute; left: 50%; top: 5px; transform: translateX(-50%); width: 150px; height: 30px; border-radius: 16px; background: #000;
+    z-index: 25; display: flex; align-items: center; justify-content: center; gap: 10px; overflow: hidden;
+    transition: width .45s cubic-bezier(.2,.9,.25,1.15), height .45s cubic-bezier(.2,.9,.25,1.15), border-radius .45s; box-shadow: 0 6px 24px rgba(0,0,0,.35); cursor: pointer; }
+  .notch .mini { width: 18px; height: 18px; border-radius: 50%; flex: none; position: relative;
+    background: radial-gradient(circle at 40% 35%, #dff3ff 0 18%, #6fb7ff 40%, transparent 62%); box-shadow: 0 0 0 2px rgba(125,211,252,.85), 0 0 10px rgba(56,189,248,.7); }
+  .notch .label { font-size: 13px; letter-spacing: .22em; color: #cfd8e6; }
+  .notch .isi { display: none; flex-direction: column; min-width: 0; }
+  .notch .status { font-size: 17px; color: var(--aksen-muda); white-space: nowrap; }
+  .notch .teks { font-size: 15px; color: #e6ecf5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 270px; }
+  .notch.turun { width: 380px; height: 64px; border-radius: 22px; justify-content: flex-start; padding: 0 20px; gap: 14px; }
+  .notch.turun .mini { width: 38px; height: 38px; }
+  .notch.turun .label { display: none; }
+  .notch.turun .isi { display: flex; }
+  .notch.dengar .mini { animation: denyut 1s ease-in-out infinite; }
+  .notch.pikir .mini { box-shadow: 0 0 0 2px rgba(245,198,107,.95), 0 0 14px rgba(245,198,107,.8); animation: putar 1s linear infinite; }
+  .notch.bicara .mini { animation: denyut .45s ease-in-out infinite; }
+  @keyframes denyut { 50% { transform: scale(1.18); } }
+  @keyframes putar { to { transform: rotate(360deg); } }
+
+  /* ---------- windows ---------- */
+  .jendela { position: absolute; border-radius: 16px; background: var(--kaca); backdrop-filter: blur(26px) saturate(1.2);
+    border: 1px solid var(--garis); box-shadow: 0 30px 80px rgba(0,0,0,.45); overflow: hidden; z-index: 10; }
+  .jendela.gelap { background: rgba(28, 31, 40, .9); }
+  .kepala { height: 52px; display: flex; align-items: center; padding: 0 18px; gap: 10px; cursor: grab; position: relative; }
+  .kepala .judul { position: absolute; left: 0; right: 0; text-align: center; font-size: 21px; color: #d9dfe9; pointer-events: none; }
+  .lampu { width: 15px; height: 15px; border-radius: 50%; position: relative; z-index: 1; }
+  .lampu.merah { background: #ff5f57; } .lampu.kuning { background: #febc2e; } .lampu.hijau { background: #28c840; }
+  .jendela.gelap .kepala { border-bottom: 1px solid rgba(255,255,255,.08); }
+
+  .tentang { left: 150px; top: 230px; width: 800px; display: none; }
+  .tentang.buka { display: block; }
+  .tentang .badan { display: flex; gap: 40px; padding: 34px 36px 36px; align-items: center; }
+  .tentang .logo-besar { width: 150px; height: 150px; flex: none; }
+  .tentang h2 { margin: 0 0 18px; font-weight: 500; font-size: 26px; }
+  .tentang p { margin: 6px 0; font-size: 21px; color: #d5dce7; }
+
+  .atlas { right: 90px; top: 150px; width: 580px; height: 700px; display: flex; flex-direction: column; }
+  .atlas.sembunyi { display: none; }
+  .atlas .orb { height: 300px; position: relative; flex: none; }
+  .atlas .orb canvas { width: 100% !important; height: 100% !important; display: block; }
+  .atlas .obrolan { flex: 1; overflow: hidden; padding: 0 24px; display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; }
+  .ucap { max-width: 92%; padding: 13px 18px; border-radius: 16px; font-size: 21px; line-height: 1.4; }
+  .ucap.atlas-u { align-self: flex-start; background: rgba(255,255,255,.08); border: 1px solid var(--garis); }
+  .ucap.saya { align-self: flex-end; background: #2b5aa6; }
+  .siapa { font-size: 14px; color: var(--redup); margin: 4px 2px -4px; }
+  .siapa.kanan { align-self: flex-end; }
+  .ketik { margin: 16px 22px 6px; height: 58px; border-radius: 999px; background: rgba(255,255,255,.07); border: 1px solid var(--garis);
+    display: flex; align-items: center; padding: 0 10px 0 24px; gap: 12px; font-size: 20px; color: var(--redup); }
+  .ketik .mic { margin-left: auto; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; border-left: 1px solid var(--garis); }
+  .ketik .mic svg { width: 22px; height: 22px; stroke: #e6ecf5; fill: none; stroke-width: 2; stroke-linecap: round; }
+  .petunjuk { text-align: center; font-size: 16px; color: var(--redup); margin: 4px 0 16px; }
+
+  /* example app window: lives between the bar and the dock (Openbox margins) */
+  .aplikasi { left: 0; right: 0; top: 40px; bottom: 166px; border-radius: 0; display: none; z-index: 9; background: #f4f6f9; color: #222; }
+  .aplikasi.buka { display: block; }
+  .aplikasi .kepala { background: #e3e7ee; border-bottom: 1px solid #c9cfd8; }
+  .aplikasi .kepala .judul { color: #333; }
+  .aplikasi .lembar { position: absolute; inset: 52px 0 0; background:
+    repeating-linear-gradient(0deg, transparent 0 31px, #d9dde3 31px 32px), repeating-linear-gradient(90deg, transparent 0 119px, #d9dde3 119px 120px); }
+
+  /* ---------- Pengaturan (Settings) ---------- */
+  .pengaturan { left: 330px; top: 110px; width: 1180px; height: 740px; display: none; flex-direction: column; background: rgba(26, 30, 44, .93); }
+  .pengaturan.buka { display: flex; }
+  .pengaturan .tubuh { flex: 1; display: flex; min-height: 0; }
+  .samping { width: 300px; padding: 10px 12px; border-right: 1px solid rgba(255,255,255,.08); overflow-y: auto; }
+  .cari { margin: 4px 4px 12px; height: 40px; border-radius: 10px; background: rgba(255,255,255,.07); border: 1px solid var(--garis); display: flex; align-items: center; padding: 0 14px; color: var(--redup); font-size: 17px; }
+  .samping button { display: flex; align-items: center; gap: 14px; width: 100%; padding: 9px 12px; border-radius: 10px; font-size: 18px; text-align: left; }
+  .samping button:hover { background: rgba(255,255,255,.06); }
+  .samping button.aktif { background: #2f6fd6; }
+  .samping .ik { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; flex: none; }
+  .samping .ik svg { width: 19px; height: 19px; }
+  .halaman { flex: 1; padding: 26px 34px; overflow-y: auto; }
+  .halaman h2 { margin: 0 0 18px; font-size: 28px; font-weight: 600; }
+  .grup { background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); border-radius: 14px; margin-bottom: 18px; }
+  .baris { display: flex; align-items: center; gap: 18px; padding: 15px 20px; font-size: 19px; border-top: 1px solid rgba(255,255,255,.07); }
+  .baris:first-child { border-top: 0; }
+  .baris .ket { color: var(--redup); font-size: 16px; }
+  .baris .kanan { margin-left: auto; display: flex; align-items: center; gap: 12px; color: #d8dfea; }
+  .geser { -webkit-appearance: none; appearance: none; width: 300px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, #38bdf8 var(--v, 60%), rgba(255,255,255,.18) var(--v, 60%)); }
+  .geser::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+  .saklar { width: 50px; height: 30px; border-radius: 15px; background: #34c759; position: relative; flex: none; }
+  .saklar::after { content: ""; position: absolute; top: 3px; right: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; }
+  .saklar.mati { background: rgba(255,255,255,.22); } .saklar.mati::after { right: auto; left: 3px; }
+  .pilih { padding: 6px 14px; border-radius: 8px; background: rgba(255,255,255,.08); border: 1px solid var(--garis); font-size: 17px; }
+  .tombol-p { padding: 8px 18px; border-radius: 9px; background: rgba(255,255,255,.1); border: 1px solid var(--garis); font-size: 17px; }
+  .tombol-p.utama { background: #2f6fd6; border-color: #2f6fd6; }
+  .batang-disk { height: 14px; border-radius: 7px; background: rgba(255,255,255,.12); overflow: hidden; display: flex; margin: 4px 0 6px; flex: 1; }
+  .batang-disk i { display: block; height: 100%; }
+  .meter { width: 300px; height: 10px; border-radius: 5px; background: rgba(255,255,255,.12); overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 35%; background: #34c759; }
+
+  /* ---------- dock ---------- */
+  .dok { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; align-items: flex-end; gap: 16px;
+    padding: 14px 20px 10px; border-radius: 30px; background: rgba(120, 130, 170, .22); backdrop-filter: blur(24px) saturate(1.3);
+    border: 1px solid rgba(255,255,255,.18); z-index: 20; }
+  .app { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 112px; transition: transform .18s; position: relative; }
+  .app:hover { transform: translateY(-10px) scale(1.08); }
+  .app .ikon { width: 84px; height: 84px; border-radius: 20px; display: grid; place-items: center; box-shadow: 0 8px 18px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.35); }
+  .app .ikon svg { width: 52px; height: 52px; }
+  .app .nama { font-size: 18px; color: #f2f5fa; text-shadow: 0 1px 3px rgba(0,0,0,.6); white-space: nowrap; }
+  .app.jalan::after { content: ""; position: absolute; bottom: -7px; width: 6px; height: 6px; border-radius: 50%; background: #e8eef7; }
+  .pemisah { width: 1px; align-self: stretch; margin: 8px 4px 30px; background: rgba(255,255,255,.25); }
+
+  /* ---------- review bar (outside the 1920×1080 screen) ---------- */
+  #uji { position: fixed; left: 10px; bottom: 10px; display: flex; gap: 6px; flex-wrap: wrap; z-index: 99; font: 13px system-ui, sans-serif; }
+  #uji button { padding: 6px 11px; border-radius: 8px; background: #111a2bee; border: 1px solid #22314d; color: #9aa8bf; }
+  #uji button.aktif { color: #fff; border-color: #38bdf8; }
+</style>
+</head>
+<body>
+<div id="layar">
+  <div class="wallpaper">
+    <svg viewBox="0 0 1920 1080" preserveAspectRatio="none" aria-hidden="true">
+      <defs>
+        <linearGradient id="g1" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#2a3d86"/><stop offset=".55" stop-color="#3b3f8f"/><stop offset="1" stop-color="#55408a"/></linearGradient>
+        <linearGradient id="g2" x1="0" x2="1"><stop offset="0" stop-color="#1b2a63"/><stop offset="1" stop-color="#3a2f72"/></linearGradient>
+        <linearGradient id="emas" x1="0" x2="1"><stop offset="0" stop-color="#f6d38a" stop-opacity="0"/><stop offset=".35" stop-color="#f6d38a" stop-opacity=".9"/><stop offset=".7" stop-color="#e9a6ff" stop-opacity=".55"/><stop offset="1" stop-color="#f6d38a" stop-opacity="0"/></linearGradient>
+      </defs>
+      <path d="M0 260 C 380 120, 620 420, 1020 300 S 1600 80, 1920 200 L1920 0 L0 0Z" fill="#0d1535" opacity=".55"/>
+      <path d="M0 560 C 300 380, 640 700, 1000 600 S 1560 300, 1920 420 L1920 1080 L0 1080Z" fill="url(#g1)" opacity=".55"/>
+      <path d="M0 560 C 300 380, 640 700, 1000 600 S 1560 300, 1920 420" fill="none" stroke="url(#emas)" stroke-width="3"/>
+      <path d="M0 760 C 420 600, 760 940, 1180 820 S 1700 640, 1920 720 L1920 1080 L0 1080Z" fill="url(#g2)" opacity=".8"/>
+      <path d="M0 760 C 420 600, 760 940, 1180 820 S 1700 640, 1920 720" fill="none" stroke="url(#emas)" stroke-width="2.4"/>
+      <path d="M0 930 C 380 860, 900 1040, 1920 900 L1920 1080 L0 1080Z" fill="#141b44" opacity=".9"/>
+    </svg>
+    <!-- a generic spiral (Atlas mark), not a copy of any logo -->
+    <svg class="pusaran" viewBox="0 0 200 200" aria-hidden="true">
+      <defs><linearGradient id="sp" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9fb3ff"/><stop offset="1" stop-color="#e2c7ff"/></linearGradient></defs>
+      <path id="spiral" fill="none" stroke="url(#sp)" stroke-width="6" stroke-linecap="round"/>
+    </svg>
+  </div>
+
+  <!-- top bar -->
+  <div class="bar">
+    <button class="menu-atlas" id="menu-atlas">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="lg" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#7dd3fc"/><stop offset=".6" stop-color="#93c5fd"/><stop offset="1" stop-color="#f5c66b"/></linearGradient></defs>
+        <circle cx="16" cy="16" r="12" fill="none" stroke="url(#lg)" stroke-width="3"/><circle cx="16" cy="16" r="5" fill="#dbeafe"/></svg>
+      Atlas
+    </button>
+    <div class="kanan">
+      <span><i class="titik"></i>Online · Kabel</span>
+      <span>⚡ 100%</span>
+      <span>RAM 0,8 / 3,8 GB</span>
+      <button class="versi-baru" title="Pasang versi baru Atlas">Versi baru</button>
+      <svg class="ikon-bar" viewBox="0 0 24 24" aria-label="Jaringan"><path d="M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1" fill="#e7ecf5"/></svg>
+      <svg class="ikon-bar" viewBox="0 0 24 24" aria-label="Volume"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/></svg>
+      <span id="jam">Selasa, 24 November 2026&nbsp; 15:57</span>
+    </div>
+  </div>
+  <div class="dropdown" id="dropdown">
+    <button data-buka="tentang">Tentang OS Ini</button>
+    <button data-buka="pengaturan">Pengaturan…</button>
+    <button>Jaringan…</button>
+    <button>Mode admin…</button>
+    <hr>
+    <button>Tidurkan</button>
+    <button>Mulai ulang</button>
+    <button>Matikan</button>
+  </div>
+
+  <!-- compact notch -->
+  <div class="notch" id="notch" title="Atlas">
+    <i class="mini"></i><span class="label">ATLAS</span>
+    <div class="isi"><div class="status" id="n-status">Mendengarkan…</div><div class="teks" id="n-teks">"Atlas, buka berkas"</div></div>
+  </div>
+
+  <!-- example app (between bar and dock) -->
+  <div class="jendela aplikasi" id="aplikasi">
+    <div class="kepala"><i class="lampu merah"></i><i class="lampu kuning"></i><i class="lampu hijau"></i><div class="judul">Tanpa judul 1 — LibreOffice Calc</div></div>
+    <div class="lembar"></div>
+  </div>
+
+  <!-- About this OS -->
+  <div class="jendela gelap tentang buka" id="tentang">
+    <div class="kepala"><button class="lampu merah" data-tutup="tentang" title="Tutup"></button><i class="lampu kuning"></i><i class="lampu hijau"></i><div class="judul">Tentang OS Ini</div></div>
+    <div class="badan">
+      <svg class="logo-besar" viewBox="0 0 100 100" aria-hidden="true">
+        <defs><linearGradient id="lb" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#7dd3fc"/><stop offset=".55" stop-color="#a5b4fc"/><stop offset="1" stop-color="#f5c66b"/></linearGradient>
+          <radialGradient id="lbi"><stop offset="0" stop-color="#1e3a8a"/><stop offset="1" stop-color="#0b1220"/></radialGradient></defs>
+        <circle cx="50" cy="50" r="44" fill="url(#lbi)"/><circle cx="50" cy="50" r="42" fill="none" stroke="url(#lb)" stroke-width="5"/>
+        <path d="M50 50 m0 -4 a4 4 0 1 1 -4 4 a8 8 0 0 1 8 -8 a12 12 0 0 1 12 12 a16 16 0 0 1 -16 16 a20 20 0 0 1 -20 -20" fill="none" stroke="#f5c66b" stroke-width="3.5" stroke-linecap="round"/>
+      </svg>
+      <div>
+        <h2>Debian Linux (Atlas OS) • Versi 1.0 (2026)</h2>
+        <p>Laptop: Zyrex Sky 232 Mini</p>
+        <p>Prosesor: Intel® Celeron® N4020</p>
+        <p>Memori: 4 GB RAM</p>
+        <p>Penyimpanan: SSD 256 GB</p>
+        <p style="color:#9aa8bf;font-size:17px;margin-top:14px">Atlas f230d80 · data dibaca dari sistem</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Atlas window -->
+  <div class="jendela atlas" id="atlas">
+    <div class="kepala"><button class="lampu merah" data-sembunyi title="Sembunyikan Atlas (notch tetap)"></button><button class="lampu kuning" data-sembunyi title="Kecilkan ke notch"></button><i class="lampu hijau"></i></div>
+    <div class="orb" id="wadah-orb"></div>
+    <div class="obrolan" id="obrolan"></div>
+    <div class="ketik">Ketik perintah untuk Atlas…<span class="mic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span></div>
+    <div class="petunjuk">Ucapkan "Atlas" atau tekan Ctrl + Alt + Spasi untuk memanggil</div>
+  </div>
+
+  <!-- Pengaturan -->
+  <div class="jendela pengaturan" id="pengaturan">
+    <div class="kepala"><button class="lampu merah" data-tutup="pengaturan" title="Tutup"></button><i class="lampu kuning"></i><i class="lampu hijau"></i><div class="judul">Pengaturan</div></div>
+    <div class="tubuh">
+      <div class="samping" id="p-samping"><div class="cari">🔍&nbsp; Cari pengaturan</div></div>
+      <div class="halaman" id="p-halaman"></div>
+    </div>
+  </div>
+
+  <!-- dock -->
+  <nav class="dok" id="dok"></nav>
+</div>
+
+<div id="uji">
+  <button data-k="diam">Diam</button><button data-k="dengar">Mendengar</button><button data-k="pikir">Berpikir</button><button data-k="bicara">Berbicara</button>
+  <button id="t-atlas">Jendela Atlas: tampil</button><button id="t-app">Contoh aplikasi</button><button id="t-tentang">Tentang OS Ini</button><button id="t-peng">Pengaturan</button>
+</div>
+
+<script src="../../atlas/web/orb.js"></script>
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const layar = $('layar');
+function skala() { const k = Math.min(innerWidth / 1920, innerHeight / 1080); layar.style.transform = `translate(-50%, -50%) scale(${k})`; }
+addEventListener('resize', skala); skala();
+
+// clock
+const HARI = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+const BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+function jam() { const d = new Date(); $('jam').textContent = `${HARI[d.getDay()].slice(0, 3)} ${d.getDate()} ${BULAN[d.getMonth()].slice(0, 3)}  ${String(d.getHours()).padStart(2, '0')}.${String(d.getMinutes()).padStart(2, '0')}`; }
+jam(); setInterval(jam, 10000);
+
+// wallpaper spiral (Archimedean, generated)
+{
+  const p = [];
+  for (let t = 0.6; t < 5.6 * Math.PI; t += 0.08) { const r = 4 + 4.9 * t; p.push(`${(100 + r * Math.cos(t + 2.2)).toFixed(1)} ${(100 + r * Math.sin(t + 2.2)).toFixed(1)}`); }
+  $('spiral').setAttribute('d', `M${p.join(' L')}`);
+}
+
+// dock icons: own designs (rounded squares + white glyphs), not brand logos
+const G = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const APPS = [
+  ['Browser', 'linear-gradient(160deg,#5fb0ff,#1d63d8)', G('<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5a13 13 0 0 1 0 17M12 3.5a13 13 0 0 0 0 17"/>')],
+  ['Dokumen', 'linear-gradient(160deg,#a7c4ff,#5f86d9)', G('<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9.5 12h6M9.5 15.5h6"/>')],
+  ['Lembar kerja', 'linear-gradient(160deg,#4fd1a5,#11845f)', G('<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M4 15h16M10 4v16"/>')],
+  ['Presentasi', 'linear-gradient(160deg,#ffb257,#f0751c)', G('<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M12 17v3M8 20h8M8 13l3-3 2 2 3-4"/>')],
+  ['Kode', 'linear-gradient(160deg,#3a4458,#1c222f)', G('<path d="M9 8l-4 4 4 4M15 8l4 4-4 4M13 6l-2 12"/>')],
+  ['Video', 'linear-gradient(160deg,#b78bff,#7046d8)', G('<rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/>')],
+  ['PDF', 'linear-gradient(160deg,#ff7a7a,#d63a3a)', G('<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9 17v-4h1.5a1.5 1.5 0 0 1 0 3H9M13.5 17v-4h1a2 2 0 0 1 0 4h-1"/>')],
+  ['Berkas', 'linear-gradient(160deg,#7cc4ff,#3b82f6)', G('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>')],
+];
+const dok = $('dok');
+for (const [nama, warna, ikon] of APPS) {
+  const b = document.createElement('button'); b.className = 'app'; b.dataset.nama = nama;
+  b.innerHTML = `<span class="ikon" style="background:${warna}">${ikon}</span><span class="nama">${nama}</span>`;
+  b.onclick = () => { if (nama === 'Lembar kerja') togel('app'); };
+  dok.append(b);
+}
+{
+  const b = document.createElement('button'); b.className = 'app'; b.dataset.nama = 'Pengaturan';
+  b.innerHTML = `<span class="ikon" style="background:linear-gradient(160deg,#a3adbd,#5d6879)">${G('<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1M18.7 18.7l-2.1-2.1M7.4 7.4L5.3 5.3"/>')}</span><span class="nama">Pengaturan</span>`;
+  b.onclick = () => bukaPengaturan();
+  dok.append(b);
+}
+dok.insertAdjacentHTML('beforeend', '<span class="pemisah"></span>');
+const atlasIkon = document.createElement('button'); atlasIkon.className = 'app jalan';
+atlasIkon.innerHTML = `<span class="ikon" style="background:radial-gradient(circle at 50% 45%,#1e3a8a,#0b1220)"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="11" fill="none" stroke="url(#lg)" stroke-width="2.6"/><circle cx="16" cy="16" r="4.5" fill="#dbeafe"/></svg></span><span class="nama">Atlas</span>`;
+atlasIkon.onclick = () => togel('atlas', true);
+dok.append(atlasIkon);
+const sampah = document.createElement('button'); sampah.className = 'app';
+sampah.innerHTML = `<span class="ikon" style="background:linear-gradient(160deg,#9aa6b8,#5b6577)">${G('<path d="M5 7h14M9 7V5h6v2M7 7l1 13h8l1-13M10.5 11v6M13.5 11v6"/>')}</span><span class="nama">Sampah</span>`;
+dok.append(sampah);
+
+// orb (Atlas's real one) in the Atlas window
+const kanvas = document.createElement('canvas');
+$('wadah-orb').append(kanvas);
+let ac = null;
+Orb.pasang(kanvas, () => (ac ||= new AudioContext()));
+Orb.aktif(true);
+
+// states: the Atlas window shows the conversation; the notch shows the state when the window is hidden
+const K = {
+  diam: { status: '', teks: '', cakap: [['atlas', 'Atlas (lokal) · 15.56'], ['a', 'Berkas dibuka.']] },
+  dengar: { status: 'Mendengarkan…', teks: '"Atlas, jadwalku hari ini apa?"', cakap: [['a', 'Berkas dibuka.'], ['s', 'Atlas, jadwalku hari ini apa?']] },
+  pikir: { status: 'Sedang berpikir…', teks: 'membaca pengingat & kalender', cakap: [['s', 'Atlas, jadwalku hari ini apa?']] },
+  bicara: { status: 'Atlas berbicara', teks: 'Hari ini ada rapat guru jam delapan…', cakap: [['s', 'Atlas, jadwalku hari ini apa?'], ['a', 'Hari ini ada rapat guru di aula jam delapan, lalu kirim laporan ke Pak Budi jam setengah sebelas.']] },
+};
+let keadaan = 'diam';
+function setK(k) {
+  keadaan = k;
+  const s = K[k];
+  const o = $('obrolan'); o.textContent = '';
+  for (const [w, t] of s.cakap) {
+    if (w === 'atlas') { const d = document.createElement('div'); d.className = 'siapa'; d.textContent = t; o.append(d); continue; }
+    const d = document.createElement('div'); d.className = `ucap ${w === 's' ? 'saya' : 'atlas-u'}`; d.textContent = t; o.append(d);
+  }
+  Orb.sibuk(k === 'pikir'); Orb.bicaraPalsu?.(k === 'bicara');
+  for (const b of document.querySelectorAll('[data-k]')) b.classList.toggle('aktif', b.dataset.k === k);
+  notch();
+}
+// Notch: always a small pill in the bar; drops (a little) only when Atlas is busy AND its window is hidden.
+function notch() {
+  const n = $('notch');
+  const sembunyi = $('atlas').classList.contains('sembunyi');
+  const turun = keadaan !== 'diam' && sembunyi;
+  n.className = `notch${turun ? ` turun ${keadaan}` : ''}`;
+  $('n-status').textContent = K[keadaan].status;
+  $('n-teks').textContent = K[keadaan].teks;
+}
+function togel(apa, tampil) {
+  if (apa === 'atlas') { const a = $('atlas'); a.classList.toggle('sembunyi', tampil === undefined ? !a.classList.contains('sembunyi') : !tampil); $('t-atlas').textContent = `Jendela Atlas: ${a.classList.contains('sembunyi') ? 'sembunyi (notch)' : 'tampil'}`; Orb.aktif(!a.classList.contains('sembunyi')); notch(); }
+  if (apa === 'app') { const x = $('aplikasi'); x.classList.toggle('buka'); document.querySelector('[data-nama="Lembar kerja"]').classList.toggle('jalan', x.classList.contains('buka')); $('t-app').classList.toggle('aktif', x.classList.contains('buka')); }
+  if (apa === 'tentang') { $('tentang').classList.toggle('buka'); $('t-tentang').classList.toggle('aktif', $('tentang').classList.contains('buka')); }
+}
+
+// menu "Atlas"
+$('menu-atlas').onclick = (e) => { e.stopPropagation(); $('dropdown').classList.toggle('buka'); $('menu-atlas').classList.toggle('buka'); };
+document.addEventListener('click', () => { $('dropdown').classList.remove('buka'); $('menu-atlas').classList.remove('buka'); });
+document.querySelector('[data-buka="tentang"]').onclick = () => { $('tentang').classList.add('buka'); };
+document.querySelector('[data-tutup="tentang"]').onclick = () => togel('tentang');
+for (const b of document.querySelectorAll('[data-sembunyi]')) b.onclick = () => togel('atlas', false);
+$('notch').onclick = () => togel('atlas', true);
+
+// drag windows by their title bar
+for (const w of document.querySelectorAll('.tentang, .atlas')) {
+  const kepala = w.querySelector('.kepala');
+  kepala.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button')) return;
+    const k = layar.getBoundingClientRect().width / 1920, r = w.getBoundingClientRect(), L = layar.getBoundingClientRect();
+    const ox = (e.clientX - r.left) / k, oy = (e.clientY - r.top) / k;
+    const gerak = (m) => { w.style.left = `${(m.clientX - L.left) / k - ox}px`; w.style.top = `${Math.max(44, (m.clientY - L.top) / k - oy)}px`; w.style.right = 'auto'; };
+    const lepas = () => { removeEventListener('pointermove', gerak); removeEventListener('pointerup', lepas); };
+    addEventListener('pointermove', gerak); addEventListener('pointerup', lepas);
+  });
+}
+
+// ---------- Pengaturan: categories like Windows Settings / other OSes, each backed by real Linux tools later ----------
+const S = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const geser = (v) => `<input type="range" class="geser" value="${v}" style="--v:${v}%" oninput="this.style.setProperty('--v', this.value + '%')">`;
+const saklar = (on) => `<span class="saklar${on ? '' : ' mati'}" onclick="this.classList.toggle('mati')"></span>`;
+const baris = (judul, kanan, ket = '') => `<div class="baris"><div>${judul}${ket ? `<div class="ket">${ket}</div>` : ''}</div><div class="kanan">${kanan}</div></div>`;
+const grup = (...b) => `<div class="grup">${b.join('')}</div>`;
+const HAL = [
+  ['sistem', 'Sistem', '#6b7280', S('<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>'), () => `
+    ${grup(baris('Nama perangkat', '<span>atlas-laptop</span><button class="tombol-p">Ubah</button>'), baris('Sistem operasi', 'Debian 13 (Atlas OS) · Versi 1.0'), baris('Atlas', 'f230d80 · <button class="tombol-p">Periksa pembaruan</button>'))}
+    ${grup(baris('Prosesor', 'Intel® Celeron® N4020 · 2 inti · 1,1–2,8 GHz'), baris('Memori', '4 GB · terpakai 0,8 GB'), baris('Grafis', 'Intel® UHD Graphics 600'), baris('Penyimpanan', 'SSD 256 GB'), baris('Suhu prosesor', '48 °C'), baris('Nomor seri', 'ZX232…'))}`],
+  ['layar', 'Layar', '#2f6fd6', S('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'), () => `
+    ${grup(baris('Kecerahan', geser(70)), baris('Kecerahan otomatis saat baterai rendah', saklar(true)))}
+    ${grup(baris('Resolusi', '<span class="pilih">1920 × 1080 (disarankan) ▾</span>'), baris('Skala tampilan', '<span class="pilih">100 % ▾</span>'), baris('Lampu malam', saklar(false), 'Warna lebih hangat setelah matahari terbenam'))}
+    ${grup(baris('Matikan layar setelah', '<span class="pilih">15 menit ▾</span>'), baris('Layar eksternal / proyektor', '<span class="pilih">Duplikat ▾</span>', 'Tidak ada layar lain terhubung'))}`],
+  ['suara', 'Suara', '#e0457b', S('<path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/>'), () => `
+    ${grup(baris('Volume', `${geser(40)} 40 %`), baris('Bisukan', saklar(false)), baris('Keluaran', '<span class="pilih">Speaker laptop ▾</span>'))}
+    ${grup(baris('Masukan (mikrofon)', '<span class="pilih">Mikrofon internal ▾</span>'), baris('Tingkat mikrofon', '<span class="meter"><i></i></span>'), baris('Volume mikrofon', geser(80)))}
+    ${grup(baris('Suara Atlas', '<span class="pilih">Algenib + efek Atlas ▾</span>'), baris('Bunyi pengingat', '<button class="tombol-p">Coba</button>'))}`],
+  ['jaringan', 'Jaringan & Internet', '#1f9d6b', S('<path d="M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/>'), () => `
+    ${grup(baris('Kabel / LAN', 'enp0s3 · Tersambung · 10.0.2.15'), baris('Wi-Fi', saklar(true)), baris('Pondok-Lt2 🔒', '<span>▂▄▆█</span><button class="tombol-p utama">Sambungkan</button>'), baris('Tamu', '<span>▂▄</span><button class="tombol-p">Sambungkan</button>'))}
+    ${grup(baris('Mode pesawat', saklar(false)), baris('Bluetooth', saklar(false), 'Tidak ada perangkat dipasangkan'), baris('Proksi', '<span class="pilih">Tidak ada ▾</span>'))}`],
+  ['daya', 'Baterai & Daya', '#e9a23b', S('<rect x="2" y="7" width="17" height="10" rx="2"/><path d="M22 11v2M6 10v4M9 10v4"/>'), () => `
+    ${grup(baris('Baterai', '82 % · sisa ± 4 jam 10 menit'), baris('Kesehatan baterai', 'Baik (94 %)'), baris('Mode hemat daya', saklar(false), 'Menyala sendiri di bawah 20 %'))}
+    ${grup(baris('Tidur setelah (pakai baterai)', '<span class="pilih">30 menit ▾</span>'), baris('Tidur setelah (dicas)', '<span class="pilih">Tidak pernah ▾</span>'), baris('Saat laptop ditutup', '<span class="pilih">Tidur ▾</span>'), baris('Tombol daya', '<span class="pilih">Tanya dulu ▾</span>'))}`],
+  ['penyimpanan', 'Penyimpanan', '#8b5cf6', S('<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15h.01M11 15h6"/>'), () => `
+    ${grup(`<div class="baris"><div style="flex:1">SSD 256 GB · terpakai 18 GB<div class="batang-disk"><i style="width:4%;background:#2f6fd6"></i><i style="width:2%;background:#e9a23b"></i><i style="width:1%;background:#e0457b"></i></div><div class="ket">Sistem 9 GB · Aplikasi 6 GB · Data Atlas 0,3 GB · Dokumen 2 GB</div></div></div>`)}
+    ${grup(baris('Tempat Sampah', '<span>120 MB</span><button class="tombol-p">Kosongkan</button>'), baris('Cadangan data Atlas', '3 cadangan · 4 MB'), baris('Berkas sementara', '<span>45 MB</span><button class="tombol-p">Bersihkan</button>'))}`],
+  ['waktu', 'Tanggal & Waktu', '#0ea5e9', S('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>'), () => `
+    ${grup(baris('Atur waktu otomatis (internet)', saklar(true)), baris('Zona waktu', '<span class="pilih">(UTC+07:00) Jakarta ▾</span>'), baris('Format', '24 jam · Senin, 24 November 2026'))}`],
+  ['aplikasi', 'Aplikasi', '#14b8a6', S('<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'), () => `
+    ${grup(...['Browser (Chrome)', 'Dokumen (LibreOffice Writer)', 'Lembar kerja (LibreOffice Calc)', 'Presentasi (LibreOffice Impress)', 'Kode (VS Code)', 'Video (mpv)', 'PDF (Evince)', 'Berkas (PCManFM)'].map((a) => baris(a, `<span class="ket">di dok</span>${saklar(true)}`)))}
+    ${grup(baris('Aplikasi bawaan untuk PDF', '<span class="pilih">PDF (Evince) ▾</span>'), baris('Aplikasi bawaan untuk web', '<span class="pilih">Browser (Chrome) ▾</span>'))}`],
+  ['atlas', 'Atlas', '#1e3a8a', S('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="#fff"/>'), () => `
+    ${grup(baris('Kata panggil "Atlas"', saklar(true)), baris('Pintasan', 'Ctrl + Alt + Spasi'), baris('Suara jawaban', saklar(true)), baris('Notch saat jendela Atlas tersembunyi', saklar(true)))}
+    ${grup(baris('Kartu izin untuk aksi yang mengubah', saklar(true)), baris('Pagar Claude', 'Menyala (dikunci di Atlas OS)'), baris('Kunci Gemini', '<span class="ket">terenkripsi</span><button class="tombol-p">Ganti</button>'), baris('Login Claude Code', '<button class="tombol-p">Masuk</button>'))}`],
+  ['pembaruan', 'Pembaruan', '#2563eb', S('<path d="M3 12a9 9 0 0 1 15.5-6.3M21 4v5h-5M21 12a9 9 0 0 1-15.5 6.3M3 20v-5h5"/>'), () => `
+    ${grup(baris('Atlas', 'f230d80 · versi terbaru', 'Dicek 12 menit lalu'), baris('Cek pembaruan', '<button class="tombol-p utama">Cek sekarang</button>'), baris('Kembali ke versi sebelumnya', '<button class="tombol-p">Kembali</button>'))}
+    ${grup(baris('Sistem (Debian)', '12 paket bisa diperbarui', 'Butuh Mode admin'), baris('Cadangan sebelum pembaruan', saklar(true)))}`],
+  ['keamanan', 'Keamanan', '#dc2626', S('<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>'), () => `
+    ${grup(baris('Kunci layar', '<button class="tombol-p">Kunci sekarang</button>'), baris('Kunci otomatis setelah', '<span class="pilih">10 menit ▾</span>'), baris('Mode admin', '<button class="tombol-p">Buka terminal admin…</button>'))}
+    ${grup(baris('Log aktivitas Atlas', '<button class="tombol-p">Lihat</button>'), baris('Aplikasi yang diizinkan', 'Diatur di Aplikasi'))}`],
+];
+function bukaPengaturan(id = 'sistem') {
+  $('pengaturan').classList.add('buka');
+  const sam = $('p-samping');
+  if (!sam.querySelector('button')) for (const [k, judul, warna, ik] of HAL) {
+    const b = document.createElement('button'); b.dataset.p = k;
+    b.innerHTML = `<span class="ik" style="background:${warna}">${ik}</span>${judul}`;
+    b.onclick = () => bukaPengaturan(k);
+    sam.append(b);
+  }
+  const h = HAL.find((x) => x[0] === id) || HAL[0];
+  for (const b of sam.querySelectorAll('button')) b.classList.toggle('aktif', b.dataset.p === h[0]);
+  $('p-halaman').innerHTML = `<h2>${h[1]}</h2>${h[4]()}`;
+  document.querySelector('[data-nama="Pengaturan"]').classList.add('jalan');
+}
+document.querySelector('[data-tutup="pengaturan"]').onclick = () => { $('pengaturan').classList.remove('buka'); document.querySelector('[data-nama="Pengaturan"]').classList.remove('jalan'); };
+document.querySelector('[data-buka="pengaturan"]').onclick = () => bukaPengaturan();
+$('t-peng').onclick = () => ($('pengaturan').classList.contains('buka') ? document.querySelector('[data-tutup="pengaturan"]').click() : bukaPengaturan());
+
+// review controls
+for (const b of document.querySelectorAll('[data-k]')) b.onclick = () => setK(b.dataset.k);
+$('t-atlas').onclick = () => togel('atlas');
+$('t-app').onclick = () => togel('app');
+$('t-tentang').onclick = () => togel('tentang');
+addEventListener('keydown', (e) => {
+  const m = { q: 'diam', w: 'dengar', e: 'pikir', r: 'bicara' }[e.key.toLowerCase()];
+  if (m) setK(m);
+  if (e.key.toLowerCase() === 'a') togel('atlas');
+  if (e.key.toLowerCase() === 'x') togel('app');
+  if (e.key.toLowerCase() === 't') togel('tentang');
+});
+// URL hash for screenshots: #<state>-<atlas hidden?>-<app open?>  e.g. #bicara-1-1
+const [hk, hs, ha, ht, hp] = location.hash.slice(1).split('-');
+if (hs === '1') togel('atlas', false);
+if (ha === '1') togel('app');
+if (ht === '0') togel('tentang');
+if (hp) bukaPengaturan(hp);
+setK(K[hk] ? hk : 'diam');
+</script>
+</body>
+</html>
