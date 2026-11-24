@@ -930,7 +930,7 @@ Atlas `0733cf0`. Tes Windows 319/319, termasuk 9 tes baru di `tests/settings.tes
 
 Belum bisa diuji di VM: tidur otomatis setelah bangun (no. 1) dan baterai mouse nirkabel (no. 3). Keduanya hanya diuji lewat tes unit; uji perangkat keras di Tahap 6.
 
-## 24. Daftar kekurangan Atlas OS (2026-11-24, DISIMPAN — belum dikerjakan)
+## 24. Daftar kekurangan Atlas OS (2026-11-24; dikerjakan mulai 2026-11-24)
 
 Hong Khai: "sistem ini sangat banyak kurangnya, fungsi, dll". Ia memilih keempat kelompok (dasar sehari-hari, pengaturan, aplikasi, desktop & Atlas) dan meminta **daftar lengkap dulu**. Sumber daftar: pemeriksaan saya, laporan `os-architect` dari plugin (baca kode + daftar paket pemasang), dan dua klaim yang saya cek ulang sendiri. Ukuran kerja: **K** = kecil (± setengah hari), **S** = sedang, **B** = besar. "Root" = butuh paket/izin baru dari pemasang.
 
@@ -993,3 +993,48 @@ Hong Khai: "sistem ini sangat banyak kurangnya, fungsi, dll". Ia memilih keempat
 
 - Daftar ini **disimpan dulu**; belum ada yang dikerjakan. Urutan pengerjaan dipilih nanti.
 - **Kunci layar (P1-5): PIN sendiri** (4–8 angka, diatur di Pengaturan › Keamanan, disimpan terenkripsi). Sandi admin tetap terpisah.
+- **Pembaruan 2026-11-24 (pesan berikutnya):** "sekalian kerjakan DESIGN §24" → semua dikerjakan berurutan P1 → P2 → P3, diuji di VM dan di-push per kelompok. P3-10 tetap hanya dicatat.
+
+### 24.7 Cara pengerjaan (keputusan teknis, dipilih sendiri karena Hong Khai meminta langsung dikerjakan)
+
+Prinsip: yang butuh root masuk lewat **pemasang**; saat berjalan, Atlas tetap tanpa sudo. Pilihan berisiko kecil saja yang diambil sendiri; semuanya bisa diubah.
+
+| No | Cara |
+|---|---|
+| P1-1 | Pengaturan › Atlas: kolom kunci bertitik → `POST /api/settings/kunci` → ditulis lewat gudang rahasia (terenkripsi `systemd-creds`), tidak pernah dicatat nilainya. Pesan "kunci belum diisi" tidak lagi menyebut jalur Windows di Atlas OS. |
+| P1-2 | Pemasang: `udisks2 ntfs-3g exfatprogs dosfstools` + polkit **hanya** mount/lepas/eject untuk atlas. Atlas memantau `lsblk` tiap 3 dtk, me-mount flashdisk baru (`udisksctl`), menampilkan ikon **Flashdisk** di bar (Buka / Lepas dengan aman). |
+| P1-3 | Pengaturan › Layar: daftar layar tersambung + **Duplikat / Perluas / Hanya layar luar / Hanya laptop** (`xrandr`). Saat proyektor dicolok, notch menawarkan pilihan. `atlas-kiosk` menyesuaikan ukuran desktop bila ukuran layar berubah. |
+| P1-4 | **Ukuran tampilan** 100/125/150/175/200 % lewat `Xft.dpi` (Chrome, LibreOffice, GTK ikut) + margin Openbox ikut dikali. Bawaan dihitung dari ukuran fisik layar (11,6" FHD → 150 %). Berlaku setelah jendela Atlas dibuka ulang otomatis. |
+| P1-5 | Kunci layar `xsecurelock` + `xss-lock`; PIN 4–8 angka (pilihan Hong Khai), hash `sha512-crypt` di file milik atlas, diperiksa `pam_pwdfile` lewat layanan PAM khusus `atlas-lock`. Terkunci saat: tombol, tidur, layar mati. **Selama terkunci Atlas tidak menjalankan perintah suara.** Tanpa PIN: tombol menjelaskan "atur PIN dulu". |
+| P1-6 | Baterai ≤ 20 % dan ≤ 10 %: peringatan (notch + bunyi); ≤ 5 % tanpa charger: peringatan 60 dtk lalu tidur. |
+| P1-7 | Pemasang: `unattended-upgrades` untuk keamanan Debian + Google Chrome + VS Code (tanpa restart otomatis). Pengaturan › Pembaruan menampilkan kapan terakhir berjalan. |
+| P1-8 | Pemasang: `locales` (id_ID.UTF-8), `libreoffice-l10n-id`, kamus & font Arab (paket opsional, dilewati bila tidak ada). Bahasa Indonesia untuk sesi & aplikasi yang dibuka Atlas; **server Atlas tetap memakai bahasa bawaan** supaya keluaran alat sistem yang dibacanya tidak berubah. Papan ketik: Pengaturan › Bahasa & Papan ketik (Inggris, Arab, …), pindah dengan **Win+Spasi**, penanda (EN/AR) di bar. |
+| P2-1 | Jam besar + kartu **Hari ini** (pengingat hari ini) di kiri atas desktop. |
+| P2-2 | `cups cups-browsed ipp-usb printer-driver-cups-pdf` (+ gutenprint opsional); atlas masuk grup `lpadmin`; Pengaturan › Printer: daftar, tambah (printer jaringan/USB tanpa driver = "everywhere"), jadikan utama, halaman uji, hapus. |
+| P2-3/4/11 | `xarchiver unzip 7zip`, `ristretto`, `galculator`, `mousepad`; masuk daftar izin Atlas ("buka kalkulator", "buka catatan"). |
+| P2-5 | PrintScreen (layar penuh) dan Alt+PrintScreen (jendela aktif) → `Gambar/Tangkapan layar/…png`, kabar di notch. |
+| P2-6 | Tombol Fn volume/bisu/kecerahan (`XF86*`) → Atlas → tampil sebentar di notch (OSD). Notch dipakai karena bar selalu terlihat, sedangkan desktop berada di bawah aplikasi. |
+| P2-7 | Penerima notifikasi `org.freedesktop.Notifications` (Python + Gio, seperti jembatan AT-SPI) → notch + daftar notifikasi di bar. |
+| P2-8 | Tombol **Jendela** di bar: daftar jendela terbuka, klik = ke depan, "Tampilkan desktop". |
+| P2-9 | `~/.config/mimeapps.list`: PDF→Evince, dokumen/lembar/presentasi→LibreOffice, gambar→Ristretto, video/audio→mpv, arsip→Xarchiver, teks→Mousepad, web→Chrome. |
+| P2-10 | `bluez libspa-0.2-bluetooth`; atlas grup `bluetooth`; Pengaturan › Bluetooth (nyala/mati, cari, pasangkan, sambung, lupakan) lewat `bluetoothctl`. |
+| P3-1 | Pengaturan › Penyimpanan › Cadangan: pilih flashdisk, salin Dokumen/Unduhan/Gambar (`rsync`), otomatis saat flashdisk itu dicolok bila cadangan terakhir > 7 hari. |
+| P3-2 | Katalog kecil (VLC, Audacity, Pinta, Thunderbird, GIMP, Inkscape, kamera) dipasang lewat **sandi admin** (helper admin yang sama dengan Mode admin, hanya nama paket dari katalog), lalu otomatis masuk daftar izin. |
+| P3-3 | Penyiapan pertama: Wi-Fi → zona waktu → kunci Gemini → selesai (sekali, bisa dilewati). |
+| P3-4 | Tombol "Login Claude Code" membuka terminal sebagai atlas. |
+| P3-5 | Keamanan: "Masalah terakhir" (aksi gagal). |
+| P3-6 | Kamera lewat katalog (P3-2). |
+| P3-7 | Kendali AT-SPI ditambah Evince, Berkas, Mousepad, dan Browser (Chrome dengan `--force-renderer-accessibility`). |
+| P3-8 | Pemasang: tombol daya fisik membuka **menu daya Atlas** (bukan langsung mati); tutup laptop = tidur + kunci. Pengaturan menampilkannya. |
+| P3-9 | "Kembalikan pengaturan Atlas OS" (layar, skala, papan ketik, tidur) + panduan USB penyelamat (pasang ulang tanpa menghapus data). |
+
+## 25. Tahap 6 — perangkat keras Zyrex (persiapan, 2026-11-24)
+
+Zyrex **belum ada** di tangan Hong Khai. Semua uji sejauh ini di VirtualBox (tanpa lampu latar, Wi-Fi, baterai, kartu suara asli), jadi **belum ada satu pun bukti perangkat keras asli**. Skill `linux-hardware-integration` dari plugin: penemuan baca-saja dulu, jangan menebak chip dari nama model.
+
+**Yang dikerjakan sekarang (pilihan Hong Khai):**
+1. `stage6/hardware-inventory.sh`: skrip **baca-saja** yang mengumpulkan semua bukti ke satu file teks (chip Wi-Fi/suara/grafis + driver & firmware, `rfkill`, kartu suara, lampu latar, baterai, layar, disk, suhu, UEFI, touchpad, kamera, Bluetooth, galat firmware di log kernel). Tidak memasang dan tidak mengubah apa pun; alamat MAC dan nomor seri disamarkan. Bisa dijalankan dari **Debian live USB sebelum Windows dihapus**. Diuji di VM.
+2. `stage6/windows-hardware-id.md`: cara mencatat Hardware ID Wi-Fi & Audio dari Device Manager Windows bawaan Zyrex (tanpa flashdisk).
+3. Perbaikan: alat Atlas `info_pc` mencari baterai dengan aturan yang sama seperti Pengaturan (jenis Battery, bukan nama `BAT*`; baterai mouse diabaikan).
+
+**Yang harus dibuktikan di Zyrex (daftar uji Tahap 6):** chip & driver Wi-Fi; codec suara + mikrofon internal (laptop N4020 kadang perlu `firmware-sof-signed`, belum ada di pemasang); lampu latar `intel_backlight`; nama baterai; resolusi & ukuran fisik layar (untuk skala, §24 P1-4); tidur/bangun (Wi-Fi & suara pulih); tombol Fn mengirim `XF86*`; touchpad; kamera; SSD & kesehatannya.
