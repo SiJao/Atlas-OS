@@ -1,0 +1,34 @@
+#!/bin/bash
+# Keeps the Atlas home screen on the display (Atlas OS DESIGN §19.3). Started by Openbox's autostart.
+# - Atlas running  -> Chrome kiosk on http://127.0.0.1:4950/?kiosk=1
+# - Atlas failed   -> Chrome kiosk on the recovery page http://127.0.0.1:4951/
+# - Chrome closed or crashed, or Atlas changed state -> Chrome is opened again on the right page.
+ATLAS="http://127.0.0.1:4950/?kiosk=1"
+PEMULIHAN="http://127.0.0.1:4951/"
+PROFILE="$HOME/.local/share/atlas/chrome-atlas"
+FLAGS=(--user-data-dir="$PROFILE" --kiosk --use-fake-ui-for-media-stream --autoplay-policy=no-user-gesture-required
+  --no-first-run --no-default-browser-check --disable-features=Translate --noerrdialogs --password-store=basic
+  --disable-session-crashed-bubble --check-for-update-interval=31536000)
+
+tujuan() {
+  if systemctl --user is-failed --quiet atlas.service; then echo "$PEMULIHAN"
+  elif curl -fsS -o /dev/null --max-time 2 "http://127.0.0.1:4950/"; then echo "$ATLAS"
+  fi
+}
+
+mkdir -p "$PROFILE/Default"
+while true; do
+  URL=$(tujuan)
+  if [ -z "$URL" ]; then sleep 2; continue; fi
+  # A killed Chrome marks its last exit as a crash and shows a "restore pages?" bar: mark it as a normal exit.
+  [ -f "$PROFILE/Default/Preferences" ] && sed -i 's/"exit_type":"[A-Za-z]*"/"exit_type":"Normal"/; s/"exited_cleanly":false/"exited_cleanly":true/' "$PROFILE/Default/Preferences"
+  google-chrome "${FLAGS[@]}" --app="$URL" >/dev/null 2>&1 &
+  CHROME=$!
+  while kill -0 "$CHROME" 2>/dev/null; do
+    sleep 5
+    BARU=$(tujuan)
+    if [ -n "$BARU" ] && [ "$BARU" != "$URL" ]; then kill "$CHROME"; sleep 1; pkill -f -- "--user-data-dir=$PROFILE" 2>/dev/null; break; fi
+  done
+  wait "$CHROME" 2>/dev/null
+  sleep 2
+done

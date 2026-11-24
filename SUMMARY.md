@@ -17,7 +17,7 @@ Laptop kedua yang saat dinyalakan **langsung masuk ke Atlas**, layar penuh. Tida
 | Dasar sistem | Debian 13 minimal + X11 + Openbox |
 | Tampilan | Google Chrome layar penuh (kiosk) yang menampilkan Atlas |
 | Otak | tetap di awan: Gemini (depan) + Claude Code (belakang); data tetap di laptop |
-| Status | Tahap 0 lulus, Tahap 1–3 selesai; Tahap 4–6 belum |
+| Status | Tahap 0 lulus, Tahap 1–4 selesai; Tahap 5–6 belum |
 
 ## 2. Rancangan sistem
 
@@ -114,7 +114,7 @@ Alurnya:
 | 1 | Pisah inti & lapisan OS di repo Atlas | ✅ **Selesai**: 6 commit, di-push |
 | 2 | Adaptor Linux `server/os/linux.js` | ✅ **Selesai**: 3 commit, uji VM 18/18 |
 | 3 | Tampilan layar penuh (prototipe Chrome → dipilih) | ✅ **Selesai**: tata letak A "Pusat", mode kiosk `/?kiosk=1`, 3 commit |
-| 4 | Skrip pemasang Debian → Atlas OS, ukur RAM asli | belum |
+| 4 | Skrip pemasang Debian → Atlas OS, ukur RAM asli | ✅ **Selesai**: `stage4/install-atlas-os.sh`, VM bersih menyala sendiri ke Atlas; RAM 715 MB diam |
 | 5 | Alur update + rollback | belum |
 | 6 | Pengamanan & uji pakai harian | belum |
 
@@ -126,12 +126,12 @@ Alurnya:
 
 ## 8. Risiko & yang masih terbuka
 
-1. **RAM 4 GB** dengan LibreOffice/VS Code/Chrome/Claude bersamaan. Pengaman §5.1 kemungkinan wajib.
+1. **RAM 4 GB:** terukur di sistem terpasang 715 MB diam dan ± 780 MB saat mendengar atau dengan LibreOffice (VM 3 GB). Masih lega; pengaman §5.1 tetap ada untuk VS Code + Claude bersamaan.
 2. **Membaca isi aplikasi** di Linux (AT-SPI) lebih lemah daripada UI Automation di Windows.
 3. **Dua OS** harus dirawat dan diuji terus.
 4. **Belum terpasang:** jendela native (`pembantu.exe`) belum punya padanan Linux. Ini pekerjaan terbesar Tahap 2.
 5. **Layar utama** sudah jadi (tata letak A, §18 DESIGN), tetapi mikrofon & suara keluar belum diuji bersama layar ini di laptop asli.
-6. **Chrome kiosk ± 500–600 MB** di VM tanpa GPU. Di laptop asli (Intel UHD 600) diharapkan lebih kecil; diukur di Tahap 4.
+6. **Chrome kiosk ± 400–600 MB** di VM tanpa GPU (bagian terbesar dari RAM). Di laptop asli (Intel UHD 600) diharapkan lebih kecil.
 
 ## 9. Lokasi file
 
@@ -145,5 +145,7 @@ Alurnya:
 | Mesin virtual uji | VirtualBox → **AtlasOS-Test** (live, Tahap 0) dan **AtlasOS-Disk** (Debian terpasang, Tahap 2–4; kunci SSH di `C:\HISADA\atlas-os\vm\`, tidak ikut repo) |
 | Skrip uji Tahap 2 | `C:\HISADA\atlas-os\stage2\` (provision-vm.sh, smoke-test.sh, real-check.mjs, atspi-diag.sh) |
 | Prototipe & uji Tahap 3 | `C:\HISADA\atlas-os\stage3\` (home-prototype.html, kiosk-check.sh, shots\) |
+| **Pemasang Atlas OS** (Tahap 4) | `C:\HISADA\atlas-os\stage4\install-atlas-os.sh` + `files\` (atlas-kiosk, recovery-server.mjs); uji: post-install-check.sh, preseed VM |
+| Deploy key hanya-baca | `C:\HISADA\atlas-os\vm\atlas_deploy_key` (tidak ikut repo; terdaftar di SiJao/atlas, id 170913308) |
 | Lapisan OS (kode) | `C:\HISADA\atlas\server\os\` (repo `SiJao/atlas`) |
 | Tes pagar | `C:\HISADA\atlas\tests\os-boundary.test.mjs` |

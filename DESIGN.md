@@ -1,13 +1,14 @@
 # Atlas OS — Dokumen Desain
 
-**Versi:** 0.6
+**Versi:** 0.7
 **Tanggal:** 2026-11-24
 **Status:**
 - **Tahap 0 LULUS** di VirtualBox (§15): pengenalan suara Bahasa Indonesia jalan di Google Chrome Linux.
 - **Tahap 1 SELESAI** (§16): lapisan OS `server/os/` di repo Atlas, 6 commit, sudah di-push.
 - **Tahap 2 SELESAI** (§17): adaptor Linux + pengganti pembantu.exe; 276 tes Windows lulus, uji asap VM 18/18.
 - **Tahap 3 SELESAI** (§18): layar utama tata letak A (dipilih Hong Khai) sebagai mode kiosk `/?kiosk=1`; 281 tes Windows lulus, diuji dengan Chrome `--kiosk` di VM.
-- Berikutnya: Tahap 4 (skrip pemasang Debian → Atlas OS, ukur RAM asli).
+- **Tahap 4 SELESAI** (§19): `stage4/install-atlas-os.sh` — dari Debian polos ke layar utama Atlas; diuji di VM bersih (menyala sendiri, hotkey, pemulihan, Wi-Fi API); RAM terpasang 715 MB diam, ± 780 MB saat mendengar / dengan LibreOffice.
+- Berikutnya: Tahap 5 (alur update + rollback).
 **Folder:** `C:\HISADA\atlas-os`. Proyek TERPISAH dari `C:\HISADA\atlas` dan tidak ikut repo `SiJao/atlas`.
 **Repo:** `SiJao/Atlas-OS` (**publik**, keputusan Hong Khai 2026-11-23). Unduhan besar di `stage0/downloads/` tidak ikut repo.
 **Hubungan:** Atlas yang sekarang dijelaskan di [../atlas/DESIGN.md](../atlas/DESIGN.md) dan [../atlas/SPEC.md](../atlas/SPEC.md). Dokumen ini hanya membahas cara Atlas berjalan sebagai "sistem operasi" di laptop kedua.
@@ -520,3 +521,119 @@ Keadaan orb yang sudah ada dipakai apa adanya:
 - menu daya baru teruji lewat router, belum diklik sungguhan di laptop asli;
 - kalender Google belum muncul di "Hari ini" (menunggu akun Google pulih);
 - suara keluar dan mikrofon di kiosk baru teruji di Tahap 0, belum bersama layar ini.
+
+## 19. Tahap 4 — skrip pemasang Atlas OS (SELESAI)
+
+**Disetujui 2026-11-24:**
+- Wi-Fi lewat **panel Wi-Fi di layar Atlas** (19.6 no. 1a);
+- kode lewat **deploy key hanya-baca** yang dipasang lewat API (no. 2a);
+- uji di **VM baru bersih** AtlasOS-Install (no. 3a).
+
+**Tujuan:** dari **Debian 13 netinst polos** (tanpa desktop) sampai laptop menyala langsung ke layar utama Atlas, dengan **satu skrip** `install-atlas-os.sh` yang dijalankan sekali sebagai root. Sekaligus **mengukur RAM sistem terpasang** (angka §5 yang masih perkiraan).
+
+### 19.1 Akun
+
+| Akun | Guna | Hak |
+|---|---|---|
+| **`atlas`** | login otomatis di layar, menjalankan Atlas & aplikasi | **tanpa sudo**; grup `audio`, `video`, `input` |
+| **admin** (dibuat saat memasang Debian, nama bebas) | perawatan lewat `Ctrl+Alt+F2` (terminal teks) | sudo, sandi hanya dipegang Hong Khai |
+
+Mematikan, mulai ulang, dan tidur tidak butuh root: logind mengizinkan pengguna lokal yang sedang aktif. Mengatur Wi-Fi juga tidak butuh root, karena polkit NetworkManager mengizinkan pengguna lokal yang aktif. Karena itu skrip root khusus (§9 no. 4) **belum dibutuhkan** di tahap ini.
+
+### 19.2 Yang dipasang
+
+| Kelompok | Paket |
+|---|---|
+| Layar | `xserver-xorg-core` + driver Intel/modesetting, `xinit`, `openbox`, `x11-xserver-utils`, `xinput` |
+| Alat atlas-helper | `xdotool`, `xprintidle`, `imagemagick`, `python3-gi`, `gir1.2-atspi-2.0`, `at-spi2-core` |
+| Suara | `pipewire`, `pipewire-pulse`, `wireplumber`, `sound-theme-freedesktop` |
+| Sistem | `network-manager`, `brightnessctl`, `libglib2.0-bin` (gio trash), `xdg-utils`, `zram-tools`, `firmware-*` (Wi-Fi Zyrex) |
+| Aplikasi izin (§9) | Google Chrome, LibreOffice (Writer/Calc/Impress + gtk3), `mpv`, `evince`, `pcmanfm`, VS Code (repo Microsoft) |
+| Atlas | Node 24 (`/opt/node`, versi sama dengan laptop 1), Claude Code CLI (untuk akun `atlas`), kode Atlas di `/opt/atlas` |
+
+Yang **tidak** dipasang: desktop apa pun (GNOME/XFCE/LXDE), display manager, layanan yang tidak dipakai.
+
+### 19.3 Urutan menyala
+
+```
+BIOS → Debian → getty tty1 login otomatis "atlas"
+  → ~/.bash_profile: startx (hanya di tty1)
+    → Openbox (tanpa menu klik-kanan, tanpa panel; hanya hotkey Atlas + Alt+Tab)
+      → autostart: tunggu server Atlas → Chrome --kiosk /?kiosk=1 (diulang bila Chrome tertutup)
+  → systemd --user: atlas.service (server Node, ATLAS_DATA=~/atlas-data, ATLAS_KIOSK=1, Restart=on-failure)
+      → gagal 3× dalam 2 menit → atlas-pemulihan.service: halaman pemulihan sederhana
+         (galat terakhir + tombol "mulai ulang Atlas" / "mulai ulang laptop")
+Ctrl+Alt+F2 → terminal teks untuk akun admin
+```
+
+### 19.4 Pengaturan bawaan Atlas di laptop 2
+
+- `pagar: true` (keputusan §9). Kartu izin menyala (bawaan kode). Usulan perbaikan diri mati.
+- Daftar aplikasi izin = §9. Proyek di `~/proyek`, folder kerja Claude `~/Documents/Atlas`.
+- zram 50 % RAM (pengaman §5.1). Penjaga RAM Atlas tetap aktif.
+- Kunci rahasia: diisi Hong Khai di layar Atlas setelah terpasang, dienkripsi systemd-creds. **Tidak pernah disalin dari laptop 1.**
+
+### 19.5 Cara menguji
+
+1. VM uji: §19.6 [TANYA 3].
+2. Pasang Debian netinst otomatis (tanpa desktop), lalu jalankan `install-atlas-os.sh` lewat SSH.
+3. Mulai ulang. VM harus **menyala sendiri ke layar utama Atlas** tanpa disentuh; dibuktikan dengan tangkapan layar VirtualBox.
+4. Ukur RAM: diam (layar utama), sambil mendengar, dengan LibreOffice terbuka, dan dengan tugas Claude.
+5. Uji pemulihan: matikan paksa server 3× → halaman pemulihan muncul → tombol "mulai ulang Atlas" bekerja.
+6. Skrip dijalankan **dua kali**: hasilnya harus sama (aman diulang).
+
+### 19.6 Pertanyaan
+
+1. **Wi-Fi di layar kiosk** (tidak ada desktop untuk memilih jaringan):
+   - (a) panel Wi-Fi kecil di layar utama Atlas, lokal: daftar jaringan, pilih, ketik sandi; sandi tidak pernah dikirim ke Gemini. Disarankan.
+   - (b) lewat terminal admin (`nmtui`) saja.
+2. **Asal kode Atlas** di laptop 2:
+   - (a) `git clone` dari `SiJao/atlas` dengan **deploy key hanya-baca**. Ini juga dipakai alur update Tahap 5. Saya buat kuncinya dan memasangnya di GitHub lewat API **atas izinmu**. Disarankan.
+   - (b) disalin dari laptop 1 dulu; deploy key menyusul di Tahap 5.
+3. **VM uji:**
+   - (a) VM baru yang bersih `AtlasOS-Install` (± 8 GB disk), supaya terbukti jalan dari Debian polos; `AtlasOS-Disk` boleh dihapus setelahnya. Disarankan.
+   - (b) pakai `AtlasOS-Disk` yang sudah ada (sudah tercampur GNOME, jadi kurang mewakili).
+4. **Login Claude Code di laptop 2:** Claude perlu login akun (sekali, di layar laptop 2). Cara yang disarankan: lewat terminal admin setelah terpasang. Ini catatan saja, bukan pilihan.
+
+### 19.7 Hasil (selesai 2026-11-24)
+
+**Uji dari nol di VM bersih `AtlasOS-Install`.** Debian 13.8 netinst dipasang otomatis dengan preseed sendiri (`stage4/debian-preseed-minimal.cfg`, tanpa tugas desktop). Debian polos memakai 245 MB RAM, 1,1 GB disk, 329 paket.
+
+| Uji | Hasil |
+|---|---|
+| `install-atlas-os.sh` pertama | ✅ 416 dtk + 65 dtk setelah satu perbaikan (lihat bawah), exit 0 |
+| Dijalankan **lagi** (aman diulang?) | ✅ 21 dtk, exit 0, tetap satu rilis |
+| Kode dari GitHub lewat deploy key hanya-baca + host key GitHub yang di-*pin* | ✅ rilis `b452861f6897` |
+| Mulai ulang → **langsung layar utama Atlas** tanpa disentuh | ✅ (`stage4/boot-1.png`) |
+| Hotkey Ctrl+Alt+Spasi sungguhan (keyboard VM) → Openbox → FIFO → mikrofon menyala | ✅ (`stage4/hotkey.png`) |
+| Dok "Lembar kerja" → LibreOffice Calc (router lokal) | ✅ |
+| Panel Wi-Fi: `/api/wifi` menjawab; sambung ke jaringan khayalan → "Perangkat Wi-Fi tidak ditemukan" (VM tanpa kartu Wi-Fi); **sandi tidak ada di file mana pun** | ✅ |
+| Server dimatikan paksa 3× → **halaman pemulihan** muncul sendiri | ✅ (`stage4/recovery-1.png`) |
+| Tombol "Mulai ulang Atlas" → layar utama kembali, riwayat utuh | ✅ (`stage4/recovery-2.png`) |
+| Akun `atlas` tanpa sudo, sandi terkunci; Claude Code 2.1.331 terpasang (belum login) | ✅ |
+| zram 1,5 GB aktif | ✅ |
+
+**RAM sistem terpasang** (VM 3 GB, tanpa GPU; PSS per bagian):
+
+| Keadaan | Total terpakai | Chrome kiosk | Atlas (node) | Xorg+Openbox | PipeWire | LibreOffice |
+|---|---|---|---|---|---|---|
+| Layar utama, diam | **715 MB** | 569 | 73 | 50 | 23 | – |
+| Mikrofon menyala | **782 MB** | 604 | 55 | 55 | 38 | – |
+| LibreOffice Calc terbuka | **784 MB** | 407 | 73 | 109 | 23 | 204 |
+
+Kesimpulan: perkiraan §5 (± 450 MB diam) terlalu optimis untuk Chrome, tetapi totalnya masih **jauh di bawah 4 GB**. Kekhawatiran Tahap 0 (± 2 GB) ternyata akibat sistem live. Dengan RAM 4 GB, sisa ± 3 GB saat diam. Pengaman §5.1 tetap ada, tetapi tidak mendesak.
+
+**Masalah yang ditemukan dan diperbaiki:**
+1. Pemasang otomatis VirtualBox memasang GNOME karena templatenya tidak menentukan `tasksel`. Kini memakai preseed sendiri.
+2. Nama `admin` dicadangkan Debian. Akun admin di VM uji: `atlasadmin`.
+3. `runuser` membawa HOME dan folder kerja root/admin, sehingga `git` gagal membaca folder admin. Kini `as_atlas` pindah ke rumah `atlas` dan menetapkan HOME.
+4. Atlas: `kendali.aplikasi` bawaan masih nama proses Windows, dan saklar usulan belum ada. Keduanya diperbaiki di repo Atlas (`fa6da19`).
+
+**Belum (butuh laptop asli / Tahap 5–6):**
+- Wi-Fi sungguhan;
+- kecerahan;
+- tombol darurat fisik;
+- suara keluar ke speaker;
+- login Claude Code;
+- isi kunci Gemini;
+- rollback otomatis saat update (Tahap 5).
