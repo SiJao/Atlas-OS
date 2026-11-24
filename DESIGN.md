@@ -929,3 +929,62 @@ Atlas `0733cf0`. Tes Windows 319/319, termasuk 9 tes baru di `tests/settings.tes
 | Menyala ulang | ✅ desktop + jendela Atlas, satu jendela masing-masing |
 
 Belum bisa diuji di VM: tidur otomatis setelah bangun (no. 1) dan baterai mouse nirkabel (no. 3). Keduanya hanya diuji lewat tes unit; uji perangkat keras di Tahap 6.
+
+## 24. Daftar kekurangan Atlas OS (2026-11-24, menunggu pilihan Hong Khai)
+
+Hong Khai: "sistem ini sangat banyak kurangnya, fungsi, dll". Ia memilih keempat kelompok (dasar sehari-hari, pengaturan, aplikasi, desktop & Atlas) dan meminta **daftar lengkap dulu**. Sumber daftar: pemeriksaan saya, laporan `os-architect` dari plugin (baca kode + daftar paket pemasang), dan dua klaim yang saya cek ulang sendiri. Ukuran kerja: **K** = kecil (± setengah hari), **S** = sedang, **B** = besar. "Root" = butuh paket/izin baru dari pemasang.
+
+### 24.1 Kesalahan yang ditemukan sambil menyusun daftar
+
+- **Ukuran layar salah.** §2 mencatat Zyrex **11,6" FHD (1920×1080)**, tetapi desktop §22 saya rancang untuk 1366×768 (margin 34/84 px, huruf 13–14 px). Di layar asli tulisan akan sangat kecil. Perlu **skala tampilan** (lihat P1-4).
+- **Pesan kunci Gemini** di halaman Atlas masih menyebut jalur Windows (`C:\HISADA\atlas\data\rahasia.json` + Notepad).
+
+### 24.2 Prioritas 1 — tanpa ini Atlas OS terasa belum bisa dipakai
+
+| No | Kekurangan | Sekarang | Usulan | Ukuran |
+|---|---|---|---|---|
+| P1-1 | **Kunci Gemini dari layar** | hanya lewat terminal admin + `rahasia.json` | kolom bertitik di Pengaturan › Atlas; disimpan terenkripsi `systemd-creds`; tidak pernah dicatat/dikirim | K |
+| P1-2 | **Flashdisk / kartu SD** | tidak ada `udisks2`/`gvfs`: tidak terbuka otomatis | pasang `udisks2 gvfs ntfs-3g exfatprogs` + aturan polkit (hanya mount/lepas untuk atlas); ikon/popup "Flashdisk" di bar + tombol **Lepas dengan aman** | S, root |
+| P1-3 | **Proyektor / monitor kedua** | hanya membaca layar pertama | Pengaturan › Layar: **Duplikat / Perluas / Hanya proyektor** (`xrandr`), deteksi saat dicolok | S |
+| P1-4 | **Skala tampilan** | tidak ada; desktop dirancang untuk 1366×768 | skala 100/125/150 % untuk desktop, jendela Atlas, Pengaturan (CSS) dan aplikasi (`Xft.dpi`), margin Openbox ikut skala; bawaan 150 % di FHD 11,6" | S |
+| P1-5 | **Kunci layar** | tombol ada tetapi tidak berbuat apa-apa (tidak ada pengunci terpasang) | perlu keputusan: buka dengan **PIN** sendiri (disimpan terenkripsi) atau sandi admin; kunci otomatis saat tidur/tutup layar | S, root |
+| P1-6 | **Baterai lemah** | hanya mode hemat diam-diam | popup peringatan 20 % dan 10 %, tidur otomatis di 5 % (simpan pekerjaan dulu) | K |
+| P1-7 | **Pembaruan keamanan Debian + Chrome + VS Code** | tidak ada; hanya Atlas yang diperbarui | `unattended-upgrades` (keamanan saja, otomatis) + tampil di Pengaturan › Pembaruan | K, root |
+| P1-8 | **Bahasa & papan ketik** | locale & keyboard bawaan pemasang (en, US); tidak ada Arab | Bahasa Indonesia untuk sistem/LibreOffice (`libreoffice-l10n-id`, kamus `hunspell-id`); papan ketik **Arab** dengan tombol pindah (mis. Alt+Shift) + penanda di bar; font Arab (Amiri / Scheherazade) | S, root |
+
+### 24.3 Prioritas 2 — kebutuhan sehari-hari
+
+| No | Kekurangan | Usulan | Ukuran |
+|---|---|---|---|
+| P2-1 | **Kartu "Hari ini" + jam besar** hilang dari desktop baru | widget pengingat hari ini + jam di wallpaper (kiri atas) | K |
+| P2-2 | **Printer** tidak ada (`cups`) | `cups` + driver umum; Pengaturan › Printer (tambah printer jaringan/USB, cetak halaman uji) | S, root |
+| P2-3 | **Zip/RAR** tidak bisa dibuka | `xarchiver` + `unzip p7zip`; klik ganda di Berkas membuka arsip | K, root |
+| P2-4 | **Penampil foto** tidak ada | `ristretto` (ringan) + ikon dok opsional | K, root |
+| P2-5 | **Tangkapan layar** | tombol PrintScreen → simpan ke `Gambar/Tangkapan layar` + notifikasi | K |
+| P2-6 | **Tombol Fn** volume/kecerahan/bisu | ikatan tombol `XF86*` di Openbox + tampilan kecil (OSD) di desktop | K |
+| P2-7 | **Notifikasi** aplikasi (Chrome, LibreOffice) | penerima notifikasi kecil → tampil di desktop (pojok kanan atas, di bawah bar) | S |
+| P2-8 | **Daftar jendela terbuka** | menu di bar atau tombol di dok: semua jendela terbuka, pulihkan yang diminimalkan, "tampilkan desktop" | S |
+| P2-9 | **Aplikasi bawaan per jenis file** | `mimeapps.list`: PDF→Evince, docx→Writer, xlsx→Calc, gambar→penampil foto, video→mpv | K |
+| P2-10 | **Bluetooth** (mouse, speaker, earphone) | `bluez` + Pengaturan › Bluetooth (cari, pasangkan, lepas) | S, root |
+| P2-11 | **Kalkulator, catatan cepat, penyunting teks ringan** | `galculator`, `mousepad` (VS Code terlalu berat untuk catatan) | K, root |
+
+### 24.4 Prioritas 3 — perawatan & lanjutan
+
+| No | Kekurangan | Usulan | Ukuran |
+|---|---|---|---|
+| P3-1 | **Cadangan dokumen** | salin otomatis Dokumen/Unduhan ke flashdisk pilihan (setelah P1-2), dengan pengingat | S |
+| P3-2 | **Memasang aplikasi lain** | daftar aplikasi pilihan (katalog kecil) yang bisa dipasang lewat Mode admin + otomatis masuk daftar izin Atlas | B, root |
+| P3-3 | **Penyiapan pertama** | saat pertama menyala: Wi-Fi → zona waktu → kunci Gemini → login Google, satu per satu | S |
+| P3-4 | **Login Claude Code dari layar** | tombol di Pengaturan › Atlas membuka terminal login (sebagai atlas) | K |
+| P3-5 | **Log untuk pengguna** | Pengaturan › Keamanan: log aktivitas sudah ada; tambah "masalah terakhir" (gagal buka aplikasi, pembaruan gagal) | K |
+| P3-6 | **Kamera** | izin kamera untuk Meet/Zoom di Chrome sudah normal; aplikasi kamera kecil opsional | K |
+| P3-7 | **Atlas mengendalikan aplikasi lain** | kendali AT-SPI baru teruji di LibreOffice; tambahkan Chrome/Evince/Berkas | B |
+| P3-8 | **Tombol daya & tutup laptop** | Pengaturan › Baterai & Daya: aksi tutup layar & tombol daya (butuh aturan logind) | K, root |
+| P3-9 | **Pemulihan/reset** | "Kembalikan pengaturan Atlas OS" dan USB penyelamat | B |
+| P3-10 | VPN, hotspot, pemindai, layar sentuh/aksesibilitas | dicatat, belum diusulkan | — |
+
+### 24.5 Catatan
+
+- Paket baru menambah ruang disk sedikit, tetapi RAM hanya saat aplikasinya dibuka (`udisks2`, `cups`, `bluez` masing-masing ± 5–15 MB bila aktif).
+- Semua yang "root" masuk lewat **pemasang** (dijalankan ulang oleh admin), bukan oleh Atlas atau Claude.
+- Perangkat keras nyata (Wi-Fi, suara, kecerahan, kamera, tombol Fn, lampu latar) tetap harus dicek di Tahap 6.
