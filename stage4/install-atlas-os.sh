@@ -65,7 +65,7 @@ VIDEO=(xserver-xorg-video-fbdev)
   xsecurelock xss-lock libpam-pwdfile openssl \
   unattended-upgrades apt-listchanges \
   locales x11-xkb-utils \
-  cups cups-browsed ipp-usb printer-driver-cups-pdf bluez libspa-0.2-bluetooth \
+  cups avahi-daemon ipp-usb printer-driver-cups-pdf bluez libspa-0.2-bluetooth \
   xarchiver unzip ristretto galculator mousepad rsync >/dev/null
 # DESIGN §24 P1-8: Indonesian for LibreOffice + spelling, Arabic fonts. Optional: skipped if a name is missing.
 for p in libreoffice-l10n-id hunspell-id fonts-hosny-amiri fonts-sil-scheherazade-new fonts-kacst 7zip printer-driver-gutenprint; do
@@ -145,17 +145,17 @@ cat > "$H/.config/openbox/rc.xml" <<'EOF'
   <desktops><number>1</number></desktops>
   <margins><top>34</top><bottom>84</bottom><left>0</left><right>0</right></margins>
   <keyboard>
-    <keybind key="C-A-space"><action name="Execute"><command>sh -c 'echo HOTKEY &gt; "$XDG_RUNTIME_DIR/atlas-hotkey"'</command></action></keybind>
-    <keybind key="W-space"><action name="Execute"><command>sh -c 'echo LAYOUT &gt; "$XDG_RUNTIME_DIR/atlas-hotkey"'</command></action></keybind>
+    <keybind key="C-A-space"><action name="Execute"><command>/opt/atlas-os/atlas-key HOTKEY</command></action></keybind>
+    <keybind key="W-space"><action name="Execute"><command>/opt/atlas-os/atlas-key LAYOUT</command></action></keybind>
     <!-- DESIGN §24 P2-5/6: screenshots and Fn keys go to Atlas through the same FIFO -->
-    <keybind key="Print"><action name="Execute"><command>sh -c 'echo SCREENSHOT &gt; "$XDG_RUNTIME_DIR/atlas-hotkey"'</command></action></keybind>
-    <keybind key="A-Print"><action name="Execute"><command>sh -c 'echo SCREENSHOT-WINDOW &gt; "$XDG_RUNTIME_DIR/atlas-hotkey"'</command></action></keybind>
-    <keybind key="XF86AudioRaiseVolume"><action name="Execute"><command>sh -c 'echo VOLUME-UP &gt; "$XDG_RUNTIME_DIR/atlas-hotkey"'</command></action></keybind>
-    <keybind key="XF86AudioLowerVolume"><action name="Execute"><command>sh -c 'echo VOLUME-DOWN &gt; "$XDG_RUNTIME_DIR/atlas-hotkey"'</command></action></keybind>
-    <keybind key="XF86AudioMute"><action name="Execute"><command>sh -c 'echo VOLUME-MUTE &gt; "$XDG_RUNTIME_DIR/atlas-hotkey"'</command></action></keybind>
-    <keybind key="XF86MonBrightnessUp"><action name="Execute"><command>sh -c 'echo BRIGHT-UP &gt; "$XDG_RUNTIME_DIR/atlas-hotkey"'</command></action></keybind>
-    <keybind key="XF86PowerOff"><action name="Execute"><command>sh -c 'echo POWER &gt; "$XDG_RUNTIME_DIR/atlas-hotkey"'</command></action></keybind>
-    <keybind key="XF86MonBrightnessDown"><action name="Execute"><command>sh -c 'echo BRIGHT-DOWN &gt; "$XDG_RUNTIME_DIR/atlas-hotkey"'</command></action></keybind>
+    <keybind key="Print"><action name="Execute"><command>/opt/atlas-os/atlas-key SCREENSHOT</command></action></keybind>
+    <keybind key="A-Print"><action name="Execute"><command>/opt/atlas-os/atlas-key SCREENSHOT-WINDOW</command></action></keybind>
+    <keybind key="XF86AudioRaiseVolume"><action name="Execute"><command>/opt/atlas-os/atlas-key VOLUME-UP</command></action></keybind>
+    <keybind key="XF86AudioLowerVolume"><action name="Execute"><command>/opt/atlas-os/atlas-key VOLUME-DOWN</command></action></keybind>
+    <keybind key="XF86AudioMute"><action name="Execute"><command>/opt/atlas-os/atlas-key VOLUME-MUTE</command></action></keybind>
+    <keybind key="XF86MonBrightnessUp"><action name="Execute"><command>/opt/atlas-os/atlas-key BRIGHT-UP</command></action></keybind>
+    <keybind key="XF86PowerOff"><action name="Execute"><command>/opt/atlas-os/atlas-key POWER</command></action></keybind>
+    <keybind key="XF86MonBrightnessDown"><action name="Execute"><command>/opt/atlas-os/atlas-key BRIGHT-DOWN</command></action></keybind>
     <keybind key="A-Tab"><action name="NextWindow"/></keybind>
     <keybind key="A-F4"><action name="Close"/></keybind>
   </keyboard>
@@ -343,6 +343,7 @@ printf '[ifupdown]\nmanaged=true\n' > /etc/NetworkManager/conf.d/10-atlas-os-man
 # ---- DESIGN §24 P1 ----
 # P1-5 screen lock: PIN checked by pam_pwdfile against a file the atlas user owns (written by Atlas Settings).
 install -m 755 "$HERE/files/atlas-lock" /opt/atlas-os/atlas-lock
+install -m 755 "$HERE/files/atlas-key" /opt/atlas-os/atlas-key   # keybinds -> Atlas FIFO (review §24 no. 16)
 cat > /etc/pam.d/atlas-lock <<EOF
 # Atlas OS lock screen (DESIGN §24 P1-5): the owner's PIN, not the account password.
 auth     required pam_pwdfile.so pwdfile=$H/.config/atlas-os/pin.hash
@@ -373,8 +374,12 @@ grep -q '^id_ID.UTF-8 UTF-8' /etc/locale.gen || echo 'id_ID.UTF-8 UTF-8' >> /etc
 locale-gen >/dev/null 2>&1 || echo "PERINGATAN: locale-gen gagal"
 # ---- DESIGN §24 P2 ----
 # P2-2 / P2-10: printers (CUPS: lpadmin group, no password) and Bluetooth for the atlas user.
-usermod -aG lpadmin,bluetooth "$ATLAS_USER" 2>/dev/null || true
-systemctl enable --now cups bluetooth >/dev/null 2>&1 || true
+# lpadmin = CUPS admin group: an accepted risk for the Settings printer panel (DESIGN §24.8). No cups-browsed:
+# printers on the pondok LAN never create queues by themselves; the owner adds them in Settings.
+usermod -aG lpadmin "$ATLAS_USER" || echo "PERINGATAN: grup lpadmin tidak ada"
+usermod -aG bluetooth "$ATLAS_USER" || echo "PERINGATAN: grup bluetooth tidak ada"
+systemctl disable --now cups-browsed >/dev/null 2>&1 || true
+systemctl enable --now cups bluetooth avahi-daemon >/dev/null 2>&1 || true
 # P3-8: the power button opens Atlas's power menu (Openbox forwards XF86PowerOff) instead of switching off at once;
 # closing the lid = sleep (xss-lock locks the screen when a PIN is set). Takes effect after the next reboot.
 install -d /etc/systemd/logind.conf.d
@@ -382,6 +387,8 @@ cat > /etc/systemd/logind.conf.d/50-atlas-os.conf <<'EOF'
 # Atlas OS (DESIGN §24 P3-8)
 [Login]
 HandlePowerKey=ignore
+# Hold the button (± 2 s) = switch off even when Atlas, Openbox or the lock screen hangs (review §24 no. 17).
+HandlePowerKeyLongPress=poweroff
 HandleLidSwitch=suspend
 HandleLidSwitchExternalPower=suspend
 EOF

@@ -1,0 +1,11 @@
+#!/bin/sh
+# Atlas OS: forward a key (Openbox keybind) to Atlas through its FIFO (DESIGN §24, review no. 16).
+# Writes only into an existing FIFO and never waits: a plain "echo > file" before Atlas created the FIFO would make a
+# regular file and silently break every hotkey; a FIFO without a reader would block Openbox forever.
+F="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/atlas-hotkey"
+[ -p "$F" ] || exit 0
+case "$1" in
+  HOTKEY|LAYOUT|SCREENSHOT|SCREENSHOT-WINDOW|VOLUME-UP|VOLUME-DOWN|VOLUME-MUTE|BRIGHT-UP|BRIGHT-DOWN|POWER) ;;
+  *) exit 2 ;;
+esac
+exec timeout 1 sh -c 'printf "%s\n" "$1" > "$2"' atlas-key "$1" "$F"

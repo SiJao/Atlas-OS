@@ -1038,3 +1038,24 @@ Zyrex **belum ada** di tangan Hong Khai. Semua uji sejauh ini di VirtualBox (tan
 3. Perbaikan: alat Atlas `info_pc` mencari baterai dengan aturan yang sama seperti Pengaturan (jenis Battery, bukan nama `BAT*`; baterai mouse diabaikan).
 
 **Yang harus dibuktikan di Zyrex (daftar uji Tahap 6):** chip & driver Wi-Fi; codec suara + mikrofon internal (laptop N4020 kadang perlu `firmware-sof-signed`, belum ada di pemasang); lampu latar `intel_backlight`; nama baterai; resolusi & ukuran fisik layar (untuk skala, §24 P1-4); tidur/bangun (Wi-Fi & suara pulih); tombol Fn mengirim `XF86*`; touchpad; kamera; SSD & kesehatannya.
+
+### 24.8 Pemeriksaan independen sebelum uji VM (2026-11-24)
+
+Plugin `atlas-os-engineering`, mode ultracode: 4 pemeriksa (keamanan, adaptor Linux, inti + tampilan, pemasang) + 1 pemeriksa skeptis per temuan. **30 temuan: 17 terbukti, 13 terbantah. Tidak ada yang berat.** Semua yang terbukti diperbaiki:
+
+| No | Temuan (tingkat) | Perbaikan |
+|---|---|---|
+| 1/4 | Cadangan gagal dicoba ulang tiap 3 dtk, popup tiap kali (sedang) | gagal = tidak dicoba otomatis lagi sampai flashdisk dicolok ulang; tombol manual tetap bisa |
+| 2 | Setelah "Duplikat", mode Perluas/Hanya layar luar tetap ter-skala & buram (sedang) | setiap layar diberi `--scale 1x1` kecuali yang dicerminkan |
+| 3/8 | Dua printer merek sama dapat nama antrean sama; yang kedua menimpa (sedang/ringan) | nama dari host + jalur lengkap; nama yang sudah dipakai diberi `-2`, `-3`; antrean lama tidak pernah ditimpa |
+| 5 | Batas 3 salah sandi admin bisa dilewati dengan permintaan paralel (ringan) | percobaan dihitung **sebelum** sandi diperiksa (Mode admin & katalog) |
+| 6 | `lpadmin` setara akses admin CUPS; `cups-browsed` membuat antrean dari jaringan pondok (ringan) | `cups-browsed` dibuang (pencarian printer lewat `avahi-daemon`); `lpadmin` **diterima sebagai risiko** demi panel Printer |
+| 7 | Cadangan otomatis berjalan saat layar terkunci; folder tujuan bisa berupa tautan (ringan) | tidak saat terkunci; tujuan berupa tautan ditolak |
+| 9 | Partisi LUKS/LVM/RAID ditawarkan sebagai flashdisk (ringan) | dilewati |
+| 11/13/14 | Skala tampilan: tersimpan 100 % bila layar belum terbaca; reset tidak mengembalikan skala; skala disimpan sebelum berhasil dipasang (ringan) | dicoba ulang; dipasang dulu baru disimpan; reset memasang ulang |
+| 12 | Pemantau flashdisk bisa berjalan ganda → popup "gagal dibuka" palsu (ringan) | satu putaran sekaligus |
+| 15 | Mencolok charger menutup popup lain yang sedang terbuka (ringan) | hanya popup baterai |
+| 16 | Tombol pintas yang ditekan sebelum Atlas siap membuat file biasa di jalur FIFO → semua pintasan mati sampai restart (ringan) | `/opt/atlas-os/atlas-key` hanya menulis ke FIFO yang ada & tidak pernah menunggu; Atlas mengganti file non-FIFO |
+| 17 | Tombol daya diabaikan → tidak ada jalan mematikan bila Atlas/layar kunci macet (ringan) | tahan tombol daya ± 2 dtk = mati paksa (`HandlePowerKeyLongPress`) |
+
+Catatan: no. 10 (hard disk USB terdaftar tetapi gagal di-mount karena aturan polkit `drive.removable`) **belum diubah**: udisks menganggap drive USB "removable" walau medianya tetap; dicek di uji perangkat keras (VM tidak punya USB).
