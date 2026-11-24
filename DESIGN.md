@@ -930,7 +930,7 @@ Atlas `0733cf0`. Tes Windows 319/319, termasuk 9 tes baru di `tests/settings.tes
 
 Belum bisa diuji di VM: tidur otomatis setelah bangun (no. 1) dan baterai mouse nirkabel (no. 3). Keduanya hanya diuji lewat tes unit; uji perangkat keras di Tahap 6.
 
-## 24. Daftar kekurangan Atlas OS (2026-11-24, menunggu pilihan Hong Khai)
+## 24. Daftar kekurangan Atlas OS (2026-11-24, DISIMPAN — belum dikerjakan)
 
 Hong Khai: "sistem ini sangat banyak kurangnya, fungsi, dll". Ia memilih keempat kelompok (dasar sehari-hari, pengaturan, aplikasi, desktop & Atlas) dan meminta **daftar lengkap dulu**. Sumber daftar: pemeriksaan saya, laporan `os-architect` dari plugin (baca kode + daftar paket pemasang), dan dua klaim yang saya cek ulang sendiri. Ukuran kerja: **K** = kecil (± setengah hari), **S** = sedang, **B** = besar. "Root" = butuh paket/izin baru dari pemasang.
 
@@ -988,3 +988,8 @@ Hong Khai: "sistem ini sangat banyak kurangnya, fungsi, dll". Ia memilih keempat
 - Paket baru menambah ruang disk sedikit, tetapi RAM hanya saat aplikasinya dibuka (`udisks2`, `cups`, `bluez` masing-masing ± 5–15 MB bila aktif).
 - Semua yang "root" masuk lewat **pemasang** (dijalankan ulang oleh admin), bukan oleh Atlas atau Claude.
 - Perangkat keras nyata (Wi-Fi, suara, kecerahan, kamera, tombol Fn, lampu latar) tetap harus dicek di Tahap 6.
+
+### 24.6 Keputusan Hong Khai (2026-11-24)
+
+- Daftar ini **disimpan dulu**; belum ada yang dikerjakan. Urutan pengerjaan dipilih nanti.
+- **Kunci layar (P1-5): PIN sendiri** (4–8 angka, diatur di Pengaturan › Keamanan, disimpan terenkripsi). Sandi admin tetap terpisah.
