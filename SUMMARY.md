@@ -1,100 +1,126 @@
 # Atlas OS — Rangkuman
 
-**Per:** 2026-11-23 · **Rinci:** [DESIGN.md](DESIGN.md) (v0.4) · **Atlas sendiri:** [../atlas/SPEC.md](../atlas/SPEC.md)
+**Per:** 2026-11-24 · **Rinci:** [DESIGN.md](DESIGN.md) (v0.8) · **Atlas sendiri:** repo private `SiJao/atlas` (SPEC.md)
 
 ---
 
 ## 1. Apa itu Atlas OS
 
-Laptop kedua yang saat dinyalakan **langsung masuk ke Atlas**, layar penuh. Tidak ada desktop Windows.
-- Atlas menjadi satu-satunya "kulit" laptop itu.
-- Pengguna hanya bisa membuka aplikasi yang diizinkan.
-- Laptop pertama (Windows) tetap menjadi tempat pengembangan.
+Laptop kedua yang saat dinyalakan **langsung masuk ke Atlas**, layar penuh, tanpa desktop.
+- Atlas menjadi satu-satunya "kulit" laptop itu. Pengguna hanya bisa membuka aplikasi yang diizinkan.
+- Laptop pertama (Windows) tetap menjadi tempat pengembangan. Versi baru Atlas sampai ke laptop 2 lewat pembaruan yang selalu minta izin.
 
 | | |
 |---|---|
 | Laptop target | Zyrex Sky 232 Mini: Celeron N4020, RAM 4 GB (disolder), SSD 256 GB, 11,6" FHD |
-| Dasar sistem | Debian 13 minimal + X11 + Openbox |
-| Tampilan | Google Chrome layar penuh (kiosk) yang menampilkan Atlas |
+| Dasar sistem | Debian 13 minimal + X11 + Openbox (tanpa desktop) |
+| Tampilan | Google Chrome layar penuh (kiosk) yang menampilkan layar utama Atlas |
 | Otak | tetap di awan: Gemini (depan) + Claude Code (belakang); data tetap di laptop |
-| Status | Tahap 0 lulus, Tahap 1–5 selesai; Tahap 6 belum (butuh laptop asli) |
+| Status | **Tahap 0–5 selesai** dan teruji di VirtualBox. **Tahap 6** (uji di laptop asli) menunggu laptop Zyrex |
 
 ## 2. Rancangan sistem
 
 ```
-┌──────────────────────── Laptop 2 (Atlas OS) ──────────────────────────┐
-│  Debian 13 minimal ── login otomatis akun "atlas" (tanpa sudo)        │
-│    └ X11 + Openbox (hotkey, jendela)                                   │
-│        └ Google Chrome --kiosk ── tampilan Atlas + pengenalan suara    │
-│              │ HTTP + SSE (127.0.0.1)                                  │
-│        Server Node Atlas (systemd) ──┬─► Gemini API (jawab cepat)      │
-│          ├ inti bersama (sama dgn Windows)  └─► Claude Code (tugas berat)│
-│          └ lapisan OS: server/os/linux.js                              │
-│        Aplikasi izin: Chrome, LibreOffice, media & PDF, VS Code        │
-│  Skrip root tetap: update · matikan · mulai ulang                      │
-│  Pemulihan: layar pemulihan · Ctrl+Alt+F2 (akun admin Hong Khai)        │
-└────────────────────────────────────────────────────────────────────────┘
-         ▲ tarik update (deploy key hanya-baca)
+┌──────────────────────────── Laptop 2 (Atlas OS) ─────────────────────────────┐
+│ Debian 13 minimal → login otomatis tty1 akun "atlas" (tanpa sudo)            │
+│   └ startx → Openbox terkunci (tanpa menu/panel; Ctrl+Alt+Spasi, Alt+Tab)     │
+│       └ atlas-kiosk → Chrome --kiosk /?kiosk=1 (dibuka lagi bila tertutup)    │
+│             │ HTTP + SSE (127.0.0.1:4950)                                      │
+│ systemd --user:                                                               │
+│   atlas.service ── server Node Atlas ──┬─► Gemini API                         │
+│     ├ inti bersama (sama dgn Windows)  └─► Claude Code                        │
+│     └ lapisan OS: server/os/linux.js + linux-helper.js + linux-atspi.py        │
+│   gagal 3× → atlas-recovery.service (halaman pemulihan :4951)                 │
+│   atlas-update-check.timer (menyala + tiap 6 jam) → atlas-update-install/…    │
+│ Aplikasi izin: Chrome, LibreOffice, mpv, Evince, PCManFM, VS Code             │
+│ Ctrl+Alt+F2 → terminal teks akun admin Hong Khai                               │
+└───────────────────────────────────────────────────────────────────────────────┘
+          ▲ cek & tarik versi baru (deploy key hanya-baca, host GitHub di-pin)
 GitHub SiJao/atlas ◄── push ── Laptop 1 (Windows, pengembangan, server/os/windows.js)
 ```
 
 ### 2.1 Inti bersama vs lapisan OS
 
-Kode Atlas dibagi dua:
-- **Inti bersama** — sama persis di Windows dan Linux: percakapan, otak, memori, pengingat, Claude, pengaman, dan seterusnya.
-- **Lapisan OS** — satu adaptor per OS dengan antarmuka yang sama (`server/os/`). Inti hanya bicara ke `platform`.
+Kode Atlas dibagi dua (Tahap 1–2):
+- **Inti bersama**, sama persis di kedua OS: percakapan, otak, memori, pengingat, Claude, pengaman, dan seterusnya.
+- **Lapisan OS** `server/os/`, satu adaptor per OS dengan antarmuka sama. Inti hanya bicara ke `platform`. Tes `os-boundary` menjaga agar kode khusus Windows tidak masuk lagi ke inti.
 
-| Fungsi lapisan OS | Windows (sudah ada) | Linux (Tahap 2) |
+| Fungsi lapisan OS | Windows | Linux (Atlas OS) |
 |---|---|---|
 | Menjalankan perintah | PowerShell | bash |
-| Info CPU/baterai/disk/jaringan | `Get-CimInstance` | `/proc`, `/sys` |
-| Daftar & tutup proses | `Get-Process` / `Stop-Process` | `ps` / `kill` |
-| Volume, kecerahan, kunci layar, daya | API Windows, `shutdown.exe` | `wpctl`, `brightnessctl`, skrip root tetap |
+| Info CPU/baterai/disk/jaringan | `Get-CimInstance` | `/proc`, `/sys`, `df` |
+| Daftar & tutup proses | `Get-Process` / `Stop-Process` | `ps` / sinyal |
+| Volume, kecerahan, kunci layar | API Windows | `wpctl`, `brightnessctl`, `xdg-screensaver` |
+| Daya (mati/mulai ulang/tidur) | `shutdown.exe` | `systemctl` (tanpa root), jeda 60 dtk diatur Atlas |
 | Buka aplikasi/file/folder/web | Start Menu, `explorer.exe` | daftar aplikasi izin, `xdg-open` |
-| Tempat sampah + undo | Recycle Bin (`$I`) | Trash freedesktop (`gio trash`) |
-| Kunci rahasia | DPAPI | `systemd-creds` / file terenkripsi |
-| Jendela, hotkey, jendela aktif | `pembantu.exe` + WebView2 | Openbox + Chrome kiosk, `xdotool` |
-| Mouse/keyboard, isi aplikasi | SendInput, UI Automation | `xdotool`, AT-SPI |
-| Pengaman Claude | blok RunAs/gsudo, `taskkill` | blok sudo/su/pkexec, `kill` |
+| Tempat sampah + undo | Recycle Bin (`$I`) | Trash freedesktop (`gio trash`, `.trashinfo`) |
+| Kunci rahasia | DPAPI | `systemd-creds --user` |
+| Jendela, hotkey, jendela aktif, waktu diam | `pembantu.exe` + WebView2 | `linux-helper.js`: `xdotool`, `xprintidle`, FIFO hotkey |
+| Mouse/keyboard + tombol darurat | SendInput + hook | `xdotool` + `xinput` (input Atlas sendiri diabaikan) |
+| Isi aplikasi (tekan/isi kontrol) | UI Automation | AT-SPI (`linux-atspi.py`) |
+| Wi-Fi | menu Windows | panel Wi-Fi Atlas (NetworkManager) |
+| Pengaman Claude | blok RunAs/gsudo | blok sudo/su/pkexec/doas, pola bahaya bash |
 
-## 3. Fungsi (yang dibawa Atlas ke Atlas OS)
+## 3. Layar utama (Tahap 3, tata letak A "Pusat" pilihan Hong Khai)
+
+- Kiri atas: **jam & tanggal**. Kiri: kartu **"Hari ini"** (pengingat hari ini).
+- Tengah: **orb** Atlas dan status ("Ucapkan "Atlas"…", Mendengarkan, Berpikir, Berbicara, Claude bekerja).
+- Kanan: **percakapan + kolom ketik**. Kartu izin juga muncul di sini.
+- Kanan atas: Online, baterai, RAM, tombol **Versi baru · pasang** (bila ada), **Wi-Fi**, **Daya**.
+- Bawah: **dok 8 aplikasi**: Browser, Dokumen, Lembar kerja, Presentasi, Kode, Video, PDF, Berkas. Dok dibuka lewat router lokal, tanpa Gemini.
+
+## 4. Fungsi (yang dibawa Atlas ke Atlas OS)
 
 | Kelompok | Fungsi |
 |---|---|
-| Bicara & dengar | panggil "Atlas", jawab dengan suara (Gemini TTS Algenib), ketik juga bisa |
-| Laptop | info laptop, buka/tutup aplikasi, buka file/folder/web, volume, kecerahan, kunci layar, matikan/mulai ulang |
+| Bicara & dengar | panggil "Atlas" atau Ctrl+Alt+Spasi, jawab dengan suara (Gemini TTS Algenib), ketik juga bisa |
+| Laptop | info laptop, buka/tutup aplikasi, volume, kecerahan, kunci layar, matikan/mulai ulang/tidur (dengan kartu izin), **Wi-Fi** |
 | File | cari, baca (teks & Office), salin, pindah, ganti nama, hapus ke tempat sampah, **undo** |
 | Pengingat & jadwal | pengingat berbunyi, ringkasan pagi, kalender & Gmail (setelah akun Google pulih) |
 | Memori | ingatan jangka panjang + memori graf (orang, proyek, janji) |
 | Tugas berat | diserahkan ke Claude Code: kode, analisis file, riset mendalam |
 | Otomatis | alur berpemicu (file baru / jadwal / email), rencana bertahap + pemeriksa |
-| Kendali | tekan/isi kontrol aplikasi, kendali mouse/keyboard, browser Atlas sendiri |
+| Kendali | tekan/isi kontrol LibreOffice (AT-SPI), kendali mouse/keyboard, browser Atlas sendiri |
 | Kabar ke HP | Telegram dua arah, email |
 | Kesehatan | "periksa atlas", log audit, mode daya normal/hemat/kritis/offline, penjaga RAM |
+| **Pembaruan** | "cek pembaruan", "pasang pembaruan", "kembali ke versi sebelumnya" |
 
-## 4. Pengamanan & batas akses
+## 5. Pengamanan & batas akses
 
-- Akun **`atlas` tanpa sudo**. Aplikasi hanya dari **daftar izin**: Chrome, LibreOffice, media & PDF, VS Code.
-- **Pagar Claude menyala:** Claude hanya boleh menulis di folder kerja, tidak bisa menjadi admin, dan pola naik-hak ditolak otomatis.
-- Pekerjaan sistem hanya lewat **satu skrip root dengan perintah tetap**: update, matikan, mulai ulang.
-- **Usulan perbaikan diri dimatikan** di laptop 2. Perubahan kode hanya datang dari laptop 1.
-- **Penjaga RAM** (wajib bila Chrome tetap ± 500 MB): peringatan saat sisa RAM < 600 MB, tugas Claude menunggu, zram menyala.
-- **Pemulihan:** systemd menyalakan ulang Atlas bila mati. Bila gagal 3× dalam 2 menit, muncul layar pemulihan (kembali ke versi lama / mulai ulang). `Ctrl+Alt+F2` membuka terminal untuk akun admin Hong Khai.
+- Akun **`atlas` tanpa sudo**, sandi terkunci (hanya login otomatis di layar). Akun admin terpisah untuk perawatan (`Ctrl+Alt+F2`).
+- **Aplikasi hanya dari daftar izin.** Openbox tanpa menu klik-kanan dan tanpa panel.
+- **Pagar Claude menyala:** Claude hanya menulis di folder kerja, tidak bisa naik hak; pola sudo/su/pkexec ditolak otomatis.
+- **Kartu izin menyala** untuk aksi yang mengubah sesuatu (termasuk daya dan pembaruan).
+- **Usulan perbaikan diri mati** di laptop 2. Kode hanya datang dari laptop 1 lewat GitHub.
+- **Wi-Fi:** sandi tidak disimpan Atlas, tidak dicatat, dan tidak dikirim ke Gemini. Nama jaringan ditampilkan sebagai teks, bukan HTML.
+- **Kunci rahasia** dienkripsi `systemd-creds`, diisi di layar laptop 2, **tidak pernah disalin** dari laptop 1.
+- **Pemulihan:** Atlas mati → dinyalakan ulang. Gagal 3× dalam 2 menit → **halaman pemulihan** dengan tombol: mulai ulang Atlas / kembali ke versi sebelumnya / mulai ulang laptop.
+- **zram** 50 % RAM + penjaga RAM Atlas.
 
-## 5. Alur update
+## 6. Alur pembaruan (Tahap 5)
 
-Alurnya (sudah dibuat dan diuji, §20 DESIGN):
 1. Laptop 1 commit dan push ke `SiJao/atlas`.
-2. Laptop 2 mengecek **saat menyala dan tiap 6 jam** (deploy key hanya-baca). Bila ada versi baru, Atlas mengabari dan tombol **"Versi baru · pasang"** muncul di layar utama.
-3. Tombol atau ucapan "pasang pembaruan" memunculkan **kartu izin** berisi daftar perubahan. Update ditunda bila Claude sedang bekerja atau ada kartu lain yang terbuka.
-4. **Uji jalan:** versi baru dinyalakan di port cadangan dengan salinan data. Gagal → berhenti, versi lama tetap jalan.
+2. Laptop 2 mengecek **saat menyala dan tiap 6 jam** (deploy key hanya-baca). Bila ada versi baru, Atlas mengabari dan tombol **"Versi baru · pasang"** muncul.
+3. Tombol atau ucapan "pasang pembaruan" memunculkan **kartu izin** berisi daftar perubahan. Update ditunda bila Claude sedang bekerja atau ada kartu lain terbuka.
+4. **Uji jalan:** versi baru dinyalakan di port cadangan dengan salinan data, tanpa layanan latar. Gagal → berhenti, versi lama tetap jalan.
 5. **Data dicadangkan** (3 cadangan terakhir), lalu Atlas pindah ke versi baru dan menyala ulang.
 6. **Kesehatan dicek 60 detik.** Gagal → **otomatis kembali** ke versi lama; versi itu ditandai buruk dan tidak ditawarkan lagi.
-7. Atlas mengabari hasilnya. "Kembali ke versi sebelumnya" bisa lewat ucapan atau tombol di halaman pemulihan.
+7. Atlas mengabari hasilnya. "Kembali ke versi sebelumnya" lewat ucapan, kartu izin, atau halaman pemulihan.
 
 `atlas-data` tidak pernah diubah oleh update. Tiga rilis terakhir disimpan.
 
-## 6. Keputusan Hong Khai (2026-11-23)
+## 7. Memasang Atlas OS
+
+1. Pasang **Debian 13 netinst** tanpa desktop (pilih hanya "standard system utilities"; nama akun admin bebas, kecuali `admin` yang dicadangkan Debian).
+2. Salin folder `stage4/` dan kunci deploy ke laptop, lalu jalankan:
+   ```
+   sudo ./install-atlas-os.sh --deploy-key /path/atlas_deploy_key
+   ```
+   Durasinya ± 7 menit (unduhan ± 1 GB). Aman dijalankan ulang, dan tidak mengganti versi Atlas yang sudah terpasang.
+3. Mulai ulang laptop. Layar langsung masuk ke Atlas.
+4. Sekali saja: isi kunci Gemini di layar Atlas, dan login Claude Code (`sudo -u atlas -i ~/.local/bin/claude`).
+
+## 8. Keputusan Hong Khai
 
 | Pertanyaan | Jawaban |
 |---|---|
@@ -105,49 +131,69 @@ Alurnya (sudah dibuat dan diuji, §20 DESIGN):
 | Pagar Claude laptop 2 | Menyala |
 | Mode update | Tanya dulu |
 | Tahap 1 | Cara A (fasad); catatan hanya di folder atlas-os; commit per langkah, push di akhir |
+| Tahap 2 | Kunci rahasia `systemd-creds`; kontrol aplikasi AT-SPI dikerjakan langsung; VM berdisk |
+| Tahap 3 | Tata letak **A · Pusat**; mode kiosk di halaman Atlas yang ada; kolom ketik di bawah percakapan |
+| Tahap 4 | Panel Wi-Fi di layar Atlas; deploy key hanya-baca (dipasang lewat API); uji di VM baru bersih |
+| Tahap 5 | Gerbang = uji jalan; cek saat menyala + tiap 6 jam; cadangan data 3 terakhir |
 | Penamaan | Nama file & isi kode baru dalam bahasa Inggris |
-| Repo Atlas OS | `SiJao/Atlas-OS`, **publik** |
+| Repo Atlas OS | `SiJao/Atlas-OS`, **publik** (kode Atlas tetap di repo private) |
 
-## 7. Tahapan
+## 9. Tahapan
 
 | Tahap | Isi | Status |
 |---|---|---|
 | 0 | Uji kelayakan: suara id-ID di Chrome Linux, RAM | ✅ **Lulus** di VirtualBox |
-| 1 | Pisah inti & lapisan OS di repo Atlas | ✅ **Selesai**: 6 commit, di-push |
-| 2 | Adaptor Linux `server/os/linux.js` | ✅ **Selesai**: 3 commit, uji VM 18/18 |
-| 3 | Tampilan layar penuh (prototipe Chrome → dipilih) | ✅ **Selesai**: tata letak A "Pusat", mode kiosk `/?kiosk=1`, 3 commit |
-| 4 | Skrip pemasang Debian → Atlas OS, ukur RAM asli | ✅ **Selesai**: `stage4/install-atlas-os.sh`, VM bersih menyala sendiri ke Atlas; RAM 715 MB diam |
-| 5 | Alur update + rollback | ✅ **Selesai**: update dari GitHub lewat tombol + kartu izin, uji jalan, cadangan, kembali otomatis; diuji termasuk versi rusak |
-| 6 | Pengamanan & uji pakai harian | belum |
+| 1 | Pisah inti & lapisan OS di repo Atlas | ✅ **Selesai**: 6 commit |
+| 2 | Adaptor Linux + pengganti pembantu.exe + AT-SPI | ✅ **Selesai**: uji VM dengan program Linux sungguhan 18/18 |
+| 3 | Layar utama layar penuh | ✅ **Selesai**: tata letak A, mode kiosk `/?kiosk=1`, diuji dengan Chrome `--kiosk` |
+| 4 | Skrip pemasang Debian → Atlas OS, ukur RAM | ✅ **Selesai**: VM bersih menyala sendiri ke Atlas; RAM 715 MB diam |
+| 5 | Alur update + rollback | ✅ **Selesai**: update sungguhan dari GitHub, versi rusak, kembali otomatis, alur dari layar |
+| 6 | Uji di laptop asli & pakai harian | ⏳ menunggu laptop Zyrex |
 
-### Hasil penting sejauh ini
+### Hasil penting
 
-- **Suara:** Google Chrome 158 di Linux mengenali "atlas buka peringatan hari ini" dalam 2,1 detik. "Pengingat" salah dengar jadi "peringatan", hal yang biasa di Web Speech.
-- **RAM (VM 3 GB):** desktop live 656 MB, Chrome 141 → **520 MB** setelah mendengar, total ± 2 GB. Lebih tinggi dari perkiraan, sebagian karena keadaan uji (sistem live, tanpa GPU). Angka pasti diukur di Tahap 4.
-- **Tahap 1:** 262 tes, 261 lulus. Yang gagal hanya `tutup_aplikasi`: kena batas 30 detik karena PowerShell lambat. Ini sudah terjadi sebelum ada perubahan, dan tes itu lulus dengan batas lebih longgar. Tes pagar `os-boundary` menjaga agar kode Windows tidak masuk lagi ke inti.
+- **Suara (Tahap 0):** Google Chrome di Linux mengenali "atlas buka peringatan hari ini" dalam 2,1 dtk. "Pengingat" salah dengar jadi "peringatan", hal yang biasa di Web Speech.
+- **RAM sistem terpasang (Tahap 4, VM 3 GB tanpa GPU):**
 
-## 8. Risiko & yang masih terbuka
+  | Keadaan | Total terpakai | Chrome kiosk | Atlas | Xorg+Openbox | LibreOffice |
+  |---|---|---|---|---|---|
+  | Layar utama, diam | **715 MB** | 569 | 73 | 50 | – |
+  | Mikrofon menyala | **782 MB** | 604 | 55 | 55 | – |
+  | LibreOffice Calc terbuka | **784 MB** | 407 | 73 | 109 | 204 |
 
-1. **RAM 4 GB:** terukur di sistem terpasang 715 MB diam dan ± 780 MB saat mendengar atau dengan LibreOffice (VM 3 GB). Masih lega; pengaman §5.1 tetap ada untuk VS Code + Claude bersamaan.
-2. **Membaca isi aplikasi** di Linux (AT-SPI) lebih lemah daripada UI Automation di Windows.
-3. **Dua OS** harus dirawat dan diuji terus.
-4. **Belum terpasang:** jendela native (`pembantu.exe`) belum punya padanan Linux. Ini pekerjaan terbesar Tahap 2.
-5. **Layar utama** sudah jadi (tata letak A, §18 DESIGN), tetapi mikrofon & suara keluar belum diuji bersama layar ini di laptop asli.
-6. **Chrome kiosk ± 400–600 MB** di VM tanpa GPU (bagian terbesar dari RAM). Di laptop asli (Intel UHD 600) diharapkan lebih kecil.
+  Dengan RAM 4 GB di Zyrex, sisa ± 3 GB saat diam. Angka ± 2 GB di Tahap 0 ternyata akibat sistem live.
+- **Pemasang (Tahap 4):** ± 7 menit pertama kali, 21 dtk saat diulang. Dari Debian polos (245 MB, 329 paket) sampai layar Atlas tanpa disentuh.
+- **Pembaruan (Tahap 5):** update dari GitHub 68 dtk; versi rusak dihentikan uji jalan; versi yang mati setelah 25 dtk dikembalikan otomatis dalam ± 35 dtk.
+- **Tes Atlas di Windows:** 292/292 lulus. Tampilan notch Windows tidak berubah.
+- **Bug yang ditemukan uji VM dan sudah diperbaiki:** ± 25. Contohnya:
+  - AT-SPI macet di lembar Calc;
+  - pembaca hotkey tertinggal setelah Atlas mati;
+  - kabar "Ada versi baru" palsu setelah update;
+  - "kembali" sempat memilih rilis rusak;
+  - daftar aplikasi kendali masih memakai nama Windows;
+  - template VirtualBox ikut memasang GNOME.
 
-## 9. Lokasi file
+## 10. Risiko & yang masih terbuka
+
+1. **Belum teruji di perangkat asli (Tahap 6):** Wi-Fi sungguhan, kecerahan, speaker, tombol darurat dengan mouse/keyboard fisik, firmware Wi-Fi Zyrex, suara + mikrofon bersama layar utama.
+2. **Chrome kiosk ± 400–600 MB** di VM tanpa GPU (bagian terbesar RAM). Di Intel UHD 600 asli diharapkan lebih kecil.
+3. **Membaca isi aplikasi** lewat AT-SPI lebih lemah daripada UI Automation di Windows. Teruji di LibreOffice Calc; aplikasi lain belum.
+4. **Dua OS** harus dirawat dan diuji terus. Tes Windows berjalan di laptop 1, uji Linux di VM.
+5. **Riwayat Atlas:** commit `d297c60` tidak bisa dijalankan sendirian (memanggil file dari commit berikutnya). Tidak berdampak, karena laptop 2 selalu memakai ujung `main`.
+6. **Kalender Google** belum tampil di "Hari ini", karena menunggu akun Google pulih.
+
+## 11. Lokasi file
 
 | Apa | Di mana |
 |---|---|
 | Repo proyek ini | `SiJao/Atlas-OS` (publik) |
-| Desain lengkap | `C:\HISADA\atlas-os\DESIGN.md` |
-| Rangkuman ini | `C:\HISADA\atlas-os\SUMMARY.md` |
-| Perlengkapan & hasil Tahap 0 | `C:\HISADA\atlas-os\stage0\` (STEPS.md, test.sh, voice-test.html, test-server.mjs, stage0-result.txt) |
-| Unduhan (ISO Debian, Rufus, pemasang VirtualBox) | `C:\HISADA\atlas-os\stage0\downloads\` (lokal saja, tidak ikut repo) |
-| Mesin virtual uji | VirtualBox → **AtlasOS-Test** (live, Tahap 0) dan **AtlasOS-Disk** (Debian terpasang, Tahap 2–4; kunci SSH di `C:\HISADA\atlas-os\vm\`, tidak ikut repo) |
-| Skrip uji Tahap 2 | `C:\HISADA\atlas-os\stage2\` (provision-vm.sh, smoke-test.sh, real-check.mjs, atspi-diag.sh) |
-| Prototipe & uji Tahap 3 | `C:\HISADA\atlas-os\stage3\` (home-prototype.html, kiosk-check.sh, shots\) |
-| **Pemasang Atlas OS** (Tahap 4) | `C:\HISADA\atlas-os\stage4\install-atlas-os.sh` + `files\` (atlas-kiosk, recovery-server.mjs, atlas-update.mjs); uji: post-install-check.sh, update-failure-test.sh, preseed VM |
-| Deploy key hanya-baca | `C:\HISADA\atlas-os\vm\atlas_deploy_key` (tidak ikut repo; terdaftar di SiJao/atlas, id 170913308) |
-| Lapisan OS (kode) | `C:\HISADA\atlas\server\os\` (repo `SiJao/atlas`) |
-| Tes pagar | `C:\HISADA\atlas\tests\os-boundary.test.mjs` |
+| Desain lengkap | `DESIGN.md` (v0.8) |
+| Rangkuman ini | `SUMMARY.md` |
+| Uji kelayakan (Tahap 0) | `stage0/` (STEPS.md, test.sh, voice-test.html, test-server.mjs, stage0-result.txt) |
+| Uji adaptor Linux (Tahap 2) | `stage2/` (provision-vm.sh, smoke-test.sh, real-check.mjs, atspi-diag.sh) |
+| Prototipe & uji layar utama (Tahap 3) | `stage3/` (home-prototype.html, kiosk-check.sh, shots/) |
+| **Pemasang Atlas OS** (Tahap 4–5) | `stage4/install-atlas-os.sh` + `stage4/files/` (atlas-kiosk, recovery-server.mjs, atlas-update.mjs) |
+| Uji pemasang & pembaruan | `stage4/post-install-check.sh`, `stage4/update-failure-test.sh`, `stage4/debian-preseed-minimal.cfg`, tangkapan layar `stage4/*.png` |
+| Kode Atlas (lapisan OS, layar utama, pembaruan) | repo private `SiJao/atlas`: `server/os/`, `server/update.js`, `web/` |
+| Lokal saja (tidak ikut repo) | `stage0/downloads/` (ISO, installer), `vm/` (kunci SSH VM, **kunci deploy**, sandi VM) |
+| Mesin virtual uji | VirtualBox: **AtlasOS-Test** (live, Tahap 0) dan **AtlasOS-Install** (Atlas OS terpasang, Tahap 4–5) |
