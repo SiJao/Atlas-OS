@@ -17,7 +17,7 @@ Laptop kedua yang saat dinyalakan **langsung masuk ke Atlas**, layar penuh. Tida
 | Dasar sistem | Debian 13 minimal + X11 + Openbox |
 | Tampilan | Google Chrome layar penuh (kiosk) yang menampilkan Atlas |
 | Otak | tetap di awan: Gemini (depan) + Claude Code (belakang); data tetap di laptop |
-| Status | Tahap 0 lulus, Tahap 1–4 selesai; Tahap 5–6 belum |
+| Status | Tahap 0 lulus, Tahap 1–5 selesai; Tahap 6 belum (butuh laptop asli) |
 
 ## 2. Rancangan sistem
 
@@ -83,14 +83,16 @@ Kode Atlas dibagi dua:
 
 ## 5. Alur update
 
-Alurnya:
+Alurnya (sudah dibuat dan diuji, §20 DESIGN):
 1. Laptop 1 commit dan push ke `SiJao/atlas`.
-2. Laptop 2 melihat ada versi baru dan **bertanya dulu** (mode `tanya`).
-3. Bila disetujui, laptop 2 menyalin versi baru ke folder rilis baru lalu menjalankan tes.
-4. Bila tes lulus, Atlas pindah ke versi baru dan menyala ulang.
-5. Kesehatan dicek selama 60 detik. Bila gagal, otomatis kembali ke versi lama.
+2. Laptop 2 mengecek **saat menyala dan tiap 6 jam** (deploy key hanya-baca). Bila ada versi baru, Atlas mengabari dan tombol **"Versi baru · pasang"** muncul di layar utama.
+3. Tombol atau ucapan "pasang pembaruan" memunculkan **kartu izin** berisi daftar perubahan. Update ditunda bila Claude sedang bekerja atau ada kartu lain yang terbuka.
+4. **Uji jalan:** versi baru dinyalakan di port cadangan dengan salinan data. Gagal → berhenti, versi lama tetap jalan.
+5. **Data dicadangkan** (3 cadangan terakhir), lalu Atlas pindah ke versi baru dan menyala ulang.
+6. **Kesehatan dicek 60 detik.** Gagal → **otomatis kembali** ke versi lama; versi itu ditandai buruk dan tidak ditawarkan lagi.
+7. Atlas mengabari hasilnya. "Kembali ke versi sebelumnya" bisa lewat ucapan atau tombol di halaman pemulihan.
 
-`data/` tidak pernah disentuh update. Tiga rilis terakhir disimpan.
+`atlas-data` tidak pernah diubah oleh update. Tiga rilis terakhir disimpan.
 
 ## 6. Keputusan Hong Khai (2026-11-23)
 
@@ -115,7 +117,7 @@ Alurnya:
 | 2 | Adaptor Linux `server/os/linux.js` | ✅ **Selesai**: 3 commit, uji VM 18/18 |
 | 3 | Tampilan layar penuh (prototipe Chrome → dipilih) | ✅ **Selesai**: tata letak A "Pusat", mode kiosk `/?kiosk=1`, 3 commit |
 | 4 | Skrip pemasang Debian → Atlas OS, ukur RAM asli | ✅ **Selesai**: `stage4/install-atlas-os.sh`, VM bersih menyala sendiri ke Atlas; RAM 715 MB diam |
-| 5 | Alur update + rollback | belum |
+| 5 | Alur update + rollback | ✅ **Selesai**: update dari GitHub lewat tombol + kartu izin, uji jalan, cadangan, kembali otomatis; diuji termasuk versi rusak |
 | 6 | Pengamanan & uji pakai harian | belum |
 
 ### Hasil penting sejauh ini
@@ -145,7 +147,7 @@ Alurnya:
 | Mesin virtual uji | VirtualBox → **AtlasOS-Test** (live, Tahap 0) dan **AtlasOS-Disk** (Debian terpasang, Tahap 2–4; kunci SSH di `C:\HISADA\atlas-os\vm\`, tidak ikut repo) |
 | Skrip uji Tahap 2 | `C:\HISADA\atlas-os\stage2\` (provision-vm.sh, smoke-test.sh, real-check.mjs, atspi-diag.sh) |
 | Prototipe & uji Tahap 3 | `C:\HISADA\atlas-os\stage3\` (home-prototype.html, kiosk-check.sh, shots\) |
-| **Pemasang Atlas OS** (Tahap 4) | `C:\HISADA\atlas-os\stage4\install-atlas-os.sh` + `files\` (atlas-kiosk, recovery-server.mjs); uji: post-install-check.sh, preseed VM |
+| **Pemasang Atlas OS** (Tahap 4) | `C:\HISADA\atlas-os\stage4\install-atlas-os.sh` + `files\` (atlas-kiosk, recovery-server.mjs, atlas-update.mjs); uji: post-install-check.sh, update-failure-test.sh, preseed VM |
 | Deploy key hanya-baca | `C:\HISADA\atlas-os\vm\atlas_deploy_key` (tidak ikut repo; terdaftar di SiJao/atlas, id 170913308) |
 | Lapisan OS (kode) | `C:\HISADA\atlas\server\os\` (repo `SiJao/atlas`) |
 | Tes pagar | `C:\HISADA\atlas\tests\os-boundary.test.mjs` |

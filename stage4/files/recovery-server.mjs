@@ -1,6 +1,6 @@
 // Atlas OS recovery page (DESIGN §10 / §19.3). Started by atlas-recovery.service when atlas.service has
 // failed 3 times in 2 minutes. Only on 127.0.0.1:4951; POSTs only from this page (Origin check).
-// Shows the last log lines and offers: restart Atlas, restart the laptop. (Stage 5 adds "back to the previous version".)
+// Shows the last log lines and offers: restart Atlas, go back to the previous version (§20), restart the laptop.
 import { createServer } from 'node:http';
 import { execFile } from 'node:child_process';
 
@@ -27,6 +27,7 @@ async function halaman(pesan = '') {
 <div class="pesan">${esc(pesan)}</div>
 <div class="tombol">
   <form method="post" action="/mulai-ulang-atlas"><button class="utama">Mulai ulang Atlas</button></form>
+  <form method="post" action="/kembali-versi"><button>Kembali ke versi sebelumnya</button></form>
   <form method="post" action="/mulai-ulang-laptop"><button>Mulai ulang laptop</button></form>
 </div>
 <pre>${esc(log.teks || 'Catatan tidak terbaca.')}</pre>
@@ -42,6 +43,10 @@ createServer(async (req, res) => {
       await jalankan('systemctl', ['--user', 'reset-failed', 'atlas.service']);
       const r = await jalankan('systemctl', ['--user', 'start', 'atlas.service']);
       return kirim(200, await halaman(r.ok ? 'Atlas sedang dinyalakan… layar utama muncul sebentar lagi.' : `Gagal: ${r.teks}`));
+    }
+    if (req.url === '/kembali-versi') { // DESIGN §20: the previous release from /opt/atlas/releases
+      const r = await jalankan('systemctl', ['--user', 'start', '--no-block', 'atlas-update-rollback.service']);
+      return kirim(200, await halaman(r.ok ? 'Atlas sedang dikembalikan ke versi sebelumnya… layar utama muncul ± 1 menit lagi.' : `Gagal: ${r.teks}`));
     }
     if (req.url === '/mulai-ulang-laptop') {
       setTimeout(() => jalankan('systemctl', ['reboot']), 1000);

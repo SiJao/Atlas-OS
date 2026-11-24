@@ -1,6 +1,6 @@
 # Atlas OS — Dokumen Desain
 
-**Versi:** 0.7
+**Versi:** 0.8
 **Tanggal:** 2026-11-24
 **Status:**
 - **Tahap 0 LULUS** di VirtualBox (§15): pengenalan suara Bahasa Indonesia jalan di Google Chrome Linux.
@@ -8,7 +8,8 @@
 - **Tahap 2 SELESAI** (§17): adaptor Linux + pengganti pembantu.exe; 276 tes Windows lulus, uji asap VM 18/18.
 - **Tahap 3 SELESAI** (§18): layar utama tata letak A (dipilih Hong Khai) sebagai mode kiosk `/?kiosk=1`; 281 tes Windows lulus, diuji dengan Chrome `--kiosk` di VM.
 - **Tahap 4 SELESAI** (§19): `stage4/install-atlas-os.sh` — dari Debian polos ke layar utama Atlas; diuji di VM bersih (menyala sendiri, hotkey, pemulihan, Wi-Fi API); RAM terpasang 715 MB diam, ± 780 MB saat mendengar / dengan LibreOffice.
-- Berikutnya: Tahap 5 (alur update + rollback).
+- **Tahap 5 SELESAI** (§20): pembaruan dari GitHub dengan izin (tombol + kartu), uji jalan, cadangan data, cek kesehatan, kembali otomatis; diuji di VM termasuk versi rusak; 292 tes Windows lulus.
+- Berikutnya: Tahap 6 (pengamanan & uji pakai harian, butuh laptop asli).
 **Folder:** `C:\HISADA\atlas-os`. Proyek TERPISAH dari `C:\HISADA\atlas` dan tidak ikut repo `SiJao/atlas`.
 **Repo:** `SiJao/Atlas-OS` (**publik**, keputusan Hong Khai 2026-11-23). Unduhan besar di `stage0/downloads/` tidak ikut repo.
 **Hubungan:** Atlas yang sekarang dijelaskan di [../atlas/DESIGN.md](../atlas/DESIGN.md) dan [../atlas/SPEC.md](../atlas/SPEC.md). Dokumen ini hanya membahas cara Atlas berjalan sebagai "sistem operasi" di laptop kedua.
@@ -637,3 +638,87 @@ Kesimpulan: perkiraan §5 (± 450 MB diam) terlalu optimis untuk Chrome, tetapi 
 - login Claude Code;
 - isi kunci Gemini;
 - rollback otomatis saat update (Tahap 5).
+
+## 20. Tahap 5 — alur update + rollback (SELESAI)
+
+**Disetujui 2026-11-24:**
+- gerbang = **uji jalan** (20.4 no. 1a);
+- cek **saat menyala + tiap 6 jam**;
+- **cadangan data, simpan 3 terakhir**.
+
+**Tujuan:** laptop 2 menerima versi Atlas baru dari `SiJao/atlas` dengan aman. Ada tiga aturan:
+- tidak ada update tanpa izin (mode **tanya**, §11);
+- versi baru diuji dulu sebelum dipakai;
+- bila gagal, otomatis kembali ke versi lama.
+
+`atlas-data` tidak pernah diubah oleh update. Sebelum berganti versi, datanya dicadangkan.
+
+### 20.1 Bagian-bagiannya
+
+| Bagian | Tugas |
+|---|---|
+| **`atlas-update`** (skrip di `/opt/atlas-os/`, dijalankan akun `atlas`, tanpa root) | `cek`: `git ls-remote` → ada commit baru? Ringkasan perubahannya ditulis ke `~/atlas-data/update.json`. `pasang`: ambil, uji, ganti, periksa, atau rollback. `kembali`: pakai rilis sebelumnya. |
+| **Pengatur waktu** `atlas-update-cek.timer` (systemd --user) | menjalankan `cek` saat menyala dan setiap N jam [TANYA 2] |
+| **Atlas (server + layar utama)** | membaca `update.json` → kartu "Ada versi baru Atlas (3 perubahan) — Pasang sekarang / Nanti". "Pasang" → `systemctl --user start atlas-update.service`. Juga lewat suara: "Atlas, cek pembaruan" / "Atlas, pasang pembaruan" (router lokal). |
+| **Halaman pemulihan** (Tahap 4) | tombol baru **"Kembali ke versi sebelumnya"** |
+
+Hanya aktif di Atlas OS (Linux, `ATLAS_KIOSK=1`). Atlas di laptop 1 (Windows) tidak berubah.
+
+### 20.2 Langkah `pasang`
+
+```
+1. git clone --depth 1 (deploy key hanya-baca) → /opt/atlas/releases/<sha>.tmp
+2. GERBANG UJI [TANYA 1] → gagal: hapus .tmp, catat, berhenti (versi lama tetap jalan)
+3. cadangkan ~/atlas-data → ~/atlas-cadangan/<waktu>.tar.gz (simpan 3)
+4. ganti tautan /opt/atlas/current → rilis baru; systemctl --user restart atlas
+5. periksa 60 dtk: GET / dan /api/keadaan harus OK terus
+6. gagal → tautan kembali ke rilis lama, restart, versi baru ditandai "buruk" (tidak ditawarkan lagi)
+7. simpan 3 rilis terakhir, hapus yang lebih lama
+8. hasil → update.json → Atlas mengabari: "Atlas diperbarui ke <sha>" / "Update gagal, kembali ke versi lama"
+```
+
+### 20.3 Pengaman
+
+- Hanya cabang `main` dari `SiJao/atlas`, lewat deploy key hanya-baca. Host GitHub di-pin.
+- Update hanya dipasang saat **tidak ada tugas Claude berjalan** dan **tidak ada kartu izin terbuka**. Bila ada, ditunda.
+- `atlas-update` tidak bisa menyentuh sistem (tanpa root). Yang diganti hanya isi `/opt/atlas`.
+- Semua langkah tercatat di audit Atlas (`update_pasang`, `update_kembali`).
+
+### 20.4 Pertanyaan
+
+1. **Gerbang uji sebelum ganti versi:**
+   - (a) **uji jalan**: versi baru dinyalakan di port cadangan dengan salinan data, lalu halaman dan API-nya diperiksa (± 20–30 dtk). Disarankan.
+   - (b) (a) **ditambah tes unit yang aman di Linux** (± 3–5 menit di Celeron; sebagian tes Atlas khusus Windows, jadi daftarnya disaring dulu).
+2. **Seberapa sering mengecek versi baru:** saat menyala + tiap 6 jam (disarankan) / saat menyala saja / tiap jam.
+3. **Cadangan data sebelum update:** ya, simpan 3 cadangan terakhir (disarankan) / tidak.
+
+### 20.5 Hasil (selesai 2026-11-24)
+
+**Kode:**
+- Atlas: `d297c60` (mode `ATLAS_UJI_JALAN=1`), `104a980` (modul `server/update.js`, alat `update_cek/pasang/kembali`, frasa router, tombol "Versi baru"), `5d617fe` (cek dijawab sekali).
+- Atlas OS: `stage4/files/atlas-update.mjs` (pengupdate), layanan + timer di pemasang, tombol "Kembali ke versi sebelumnya" di halaman pemulihan.
+- Tes Windows: **292/292** lulus.
+
+**Uji di VM `AtlasOS-Install`:**
+
+| Uji | Hasil |
+|---|---|
+| Timer cek saat menyala | ✅ menemukan versi baru **sungguhan** di GitHub (`104a980`, 2 perubahan) |
+| Pasang dari GitHub | ✅ 68 dtk: clone → uji jalan → cadangan data → ganti → sehat 60 dtk → `b452861 → 104a980` |
+| Versi rusak (galat sintaks) | ✅ dihentikan oleh uji jalan ("SyntaxError: Unexpected identifier"); versi aktif tidak tersentuh |
+| Versi yang mati 25 dtk setelah menyala | ✅ lolos uji jalan, gagal cek kesehatan → **otomatis kembali** ke versi lama (± 35 dtk); rilis rusak dihapus & ditandai buruk |
+| "Kembali ke versi sebelumnya" | ✅ ke rilis sehat sebelumnya, melewati rilis buruk |
+| **Alur dari layar** | ✅ "cek pembaruan" → tombol **Versi baru · pasang** → diklik mouse → **kartu izin** "Pasang versi baru Atlas? 104a980 → 26e1247" → **Ya, izinkan** → "Atlas sudah diperbarui ke versi 26e12476e3ab" (dibacakan) |
+
+Repo uji lokal di VM dipakai untuk versi rusak, jadi tidak ada commit rusak yang pernah menyentuh `SiJao/atlas`. VM dibersihkan kembali ke `104a980`.
+
+**Bug yang ditemukan uji dan sudah diperbaiki:**
+1. Atlas yang menyala setelah update mengumumkan lagi "Ada versi baru". Kini pengupdate menulis status antara `memasang` / `mengembalikan` yang tidak diumumkan.
+2. Kabar setelah restart tidak muncul. Kini kunci kabar terakhir disimpan di `data/update-kabar.json`.
+3. "Kembali" sempat memilih rilis yang rusak. Kini rilis gagal dihapus, rilis buruk dilewati, dan `sebelumnya` tidak hilang tertimpa.
+4. Pesan galat uji jalan kurang jelas. Kini baris `…Error` yang ditampilkan.
+5. Cache riwayat commit kini per alamat repo, sehingga repo uji tidak mencampuri cache GitHub.
+6. Menjalankan ulang pemasang dulu ikut mengganti versi diam-diam. Kini versi yang sudah terpasang dibiarkan; mengganti versi hanya lewat pengupdate.
+7. "Cek pembaruan" dijawab dua kali. Kini sekali.
+
+**Catatan jujur:** commit Atlas `d297c60` sudah meng-import `./update.js` yang baru masuk di `104a980`, jadi `d297c60` sendirian tidak bisa dijalankan. Laptop 2 selalu memakai ujung `main` sehingga tidak berdampak. Riwayat tidak ditulis ulang, karena itu butuh force push.

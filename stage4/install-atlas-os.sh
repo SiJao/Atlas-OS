@@ -144,6 +144,7 @@ cat > "$H/.config/openbox/rc.xml" <<'EOF'
 EOF
 install -m 755 "$HERE/files/atlas-kiosk" "$H/.local/bin/atlas-kiosk"
 install -d /opt/atlas-os && install -m 644 "$HERE/files/recovery-server.mjs" /opt/atlas-os/recovery-server.mjs
+install -m 644 "$HERE/files/atlas-update.mjs" /opt/atlas-os/atlas-update.mjs   # DESIGN §20
 
 langkah "7. Layanan Atlas (systemd --user) + halaman pemulihan"
 cat > "$H/.config/systemd/user/atlas.service" <<'EOF'
@@ -169,6 +170,34 @@ ExecStart=/opt/node/bin/node /opt/atlas-os/recovery-server.mjs
 Restart=on-failure
 EOF
 
+# Updates (DESIGN §20): check at boot + every 6 h; install/rollback only when Hong Khai says yes (via Atlas).
+for x in check:cek install:pasang rollback:kembali; do
+  unit=${x%%:*}; perintah=${x##*:}
+  cat > "$H/.config/systemd/user/atlas-update-$unit.service" <<EOF
+[Unit]
+Description=Atlas — pembaruan ($perintah)
+
+[Service]
+Type=oneshot
+Environment=ATLAS_DATA=%h/atlas-data
+ExecStart=/opt/node/bin/node /opt/atlas-os/atlas-update.mjs $perintah
+TimeoutStartSec=15min
+EOF
+done
+cat > "$H/.config/systemd/user/atlas-update-check.timer" <<'EOF'
+[Unit]
+Description=Atlas — cek pembaruan saat menyala dan tiap 6 jam
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=6h
+
+[Install]
+WantedBy=timers.target
+EOF
+install -d "$H/.config/systemd/user/timers.target.wants"
+ln -sfn ../atlas-update-check.timer "$H/.config/systemd/user/timers.target.wants/atlas-update-check.timer"
+
 langkah "8. Kode Atlas dari $ATLAS_REPO ($ATLAS_REF) dengan deploy key hanya-baca"
 install -d -o "$ATLAS_USER" -g "$ATLAS_USER" -m 700 "$H/.ssh"
 if [ -n "$DEPLOY_KEY" ]; then install -o "$ATLAS_USER" -g "$ATLAS_USER" -m 600 "$DEPLOY_KEY" "$H/.ssh/atlas_deploy_key"; fi
@@ -182,14 +211,19 @@ Host github.com
 EOF
 chown "$ATLAS_USER:$ATLAS_USER" "$H/.ssh/known_hosts" "$H/.ssh/config"; chmod 600 "$H/.ssh/config"
 install -d -o "$ATLAS_USER" -g "$ATLAS_USER" /opt/atlas /opt/atlas/releases
-SHA=$(as_atlas git ls-remote "$ATLAS_REPO" "$ATLAS_REF" | cut -c1-12)
-[ -n "$SHA" ] || { echo "Tidak bisa membaca repo Atlas (deploy key?)."; exit 1; }
-if [ ! -d "/opt/atlas/releases/$SHA" ]; then
-  as_atlas git clone -q --depth 1 --branch "$ATLAS_REF" "$ATLAS_REPO" "/opt/atlas/releases/$SHA.tmp"
-  as_atlas mv "/opt/atlas/releases/$SHA.tmp" "/opt/atlas/releases/$SHA"
+if [ -e /opt/atlas/current ]; then
+  # Already installed: changing versions is the updater's job (with Hong Khai's yes, test run, rollback).
+  echo "rilis tetap: $(basename "$(readlink -f /opt/atlas/current)") (versi baru dipasang lewat atlas-update)"
+else
+  SHA=$(as_atlas git ls-remote "$ATLAS_REPO" "$ATLAS_REF" | cut -c1-12)
+  [ -n "$SHA" ] || { echo "Tidak bisa membaca repo Atlas (deploy key?)."; exit 1; }
+  if [ ! -d "/opt/atlas/releases/$SHA" ]; then
+    as_atlas git clone -q --depth 20 --branch "$ATLAS_REF" "$ATLAS_REPO" "/opt/atlas/releases/$SHA.tmp"
+    as_atlas mv "/opt/atlas/releases/$SHA.tmp" "/opt/atlas/releases/$SHA"
+  fi
+  as_atlas ln -sfn "/opt/atlas/releases/$SHA" /opt/atlas/current
+  echo "rilis: $SHA"
 fi
-as_atlas ln -sfn "/opt/atlas/releases/$SHA" /opt/atlas/current
-echo "rilis: $SHA"
 
 langkah "9. Pengaturan bawaan Atlas OS (pagar menyala, usulan mati, Chrome dibuka oleh atlas-kiosk)"
 if [ ! -f "$H/atlas-data/pengaturan.json" ]; then
