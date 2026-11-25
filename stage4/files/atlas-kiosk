@@ -76,7 +76,14 @@ while true; do
         read -r W H < <(xdotool getdisplaygeometry)
         wmctrl -i -r "$D" -b remove,maximized_vert,maximized_horz
         wmctrl -i -r "$D" -e "0,0,0,$W,$H" && wmctrl -i -r "$D" -b add,below,sticky,skip_taskbar,skip_pager && DIATUR="$D"
-      elif [ -z "$D" ] && [ $((SECONDS - DESKTOP_DIBUKA)) -gt 15 ]; then
+      elif [ -n "$D" ]; then
+        # Second guard (review §24.10 no. 1): a desktop that got iconified or maximized anyway comes back within 2 s.
+        case "$(xprop -id "$D" _NET_WM_STATE 2>/dev/null)" in
+          *_NET_WM_STATE_HIDDEN*) wmctrl -i -a "$D"; DIATUR="" ;;
+          *_NET_WM_STATE_MAXIMIZED*) DIATUR="" ;;
+        esac
+      fi
+      if [ -z "$D" ] && [ $((SECONDS - DESKTOP_DIBUKA)) -gt 15 ]; then
         google-chrome "${FLAGS[@]}" --app="$DESKTOP" >/dev/null 2>&1 & DESKTOP_DIBUKA=$SECONDS
       fi
       # The Atlas window only once the desktop exists (Chrome is up), so both share one browser process.

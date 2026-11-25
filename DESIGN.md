@@ -1087,3 +1087,32 @@ Catatan:
 - Daftar aktivitas Keamanan memakai nama kunci mentah (`pengaturan: jadikanCadangan`, `bukaDrive`); belum diubah (kecil).
 - Daftar penyiapan pertama muncul lagi setiap Atlas dimulai ulang sampai "Selesai" ditekan (sesuai rancangan: "Nanti" = tanya lagi).
 - Masih harus diuji di VM: kunci layar PIN, skala tampilan, proyektor/mode layar, papan ketik Arab, notifikasi, peluncur, printer (cups-pdf), Bluetooth (VM tanpa Bluetooth), katalog aplikasi, tombol Fn/PrintScreen.
+
+### 24.10 Jendela: minimize, maximize, ubah ukuran (uji VM 2026-11-25)
+
+**Masalah (dilaporkan Hong Khai, terbukti di VM):** tombol Minimize dan Maximize di judul jendela tidak berbuat apa-apa, dan jendela tidak bisa diubah ukurannya. Penyebab: bagian `<mouse>` di `rc.xml` **menggantikan semua** bawaan Openbox, padahal isinya hanya Pindah, Tutup, dan klik-untuk-fokus. Judul jendela Clearlooks juga hanya ± 16 px dengan tombol ± 10 px, terlalu kecil untuk layar 11,6".
+
+**Perbaikan:**
+
+| Bagian | Isi |
+|---|---|
+| Tombol judul | Minimize = `Iconify`, Maximize = `ToggleMaximize`, Tutup; klik ganda judul = maximize/kembali |
+| Ubah ukuran | tarik tepi/sudut/pegangan bawah (`Top … BRCorner` → `Resize`); Alt + tarik kiri = pindah, Alt + tarik kanan = ubah ukuran |
+| Tombol keyboard | Win+↑ = maximize/kembali, Win+↓ = minimize (seperti Windows) |
+| Aturan aplikasi | hanya jendela `type="normal"` dibuka maximized (dialog Simpan/Buka tidak); "kembali" = 80 % layar, di tengah |
+| Tema `AtlasOS` | gelap, warna Atlas; huruf judul 11 pt (ikut `Xft.dpi`, jadi ikut skala tampilan) → judul ± 30 px di 100 %; tombol 10×10; pegangan bawah 6 px dengan sudut biru; dipasang di `/usr/share/themes/AtlasOS` (tidak bisa diubah akun atlas) |
+| Mengembalikan jendela | ikon dok, daftar "Jendela" (kini "Berkas — judul"), Alt+Tab |
+| Lain-lain | ikon Berkas di dok membuka folder rumah (dulu folder rilis Atlas); menu bar diberi `backdrop-filter: blur` |
+
+Pemeriksaan independen (2 pemeriksa + verifikasi skeptis per temuan): **8 temuan, 4 terbukti, 4 terbantah.** Yang terbukti diperbaiki:
+
+| No | Temuan | Perbaikan |
+|---|---|---|
+| 1 | Win+↓/↑, Alt+F4, Alt+tarik bisa mengenai jendela desktop Atlas sendiri → wallpaper, dok, bar hilang tanpa jalan kembali (sedang) | aksi itu dibungkus `<If><query><name>localhost__desktop</name></query>` (tidak berlaku untuk desktop); lapis kedua: `atlas-kiosk` mengembalikan desktop yang tersembunyi/ter-maximize dalam 2 dtk |
+| 2 | Ukuran 80 % dari aturan `class="*"` ikut mengenai desktop (ringan) | aturan desktop diberi `<size>100 %</size>` |
+| 3 | Pesan galat "Cadangkan" bisa tertimpa "Mencadangkan…" yang basi (sedang) | pesan dibaca setelah data halaman selesai dibaca |
+| 4 | `rapikanBar` mengukur notch yang sedang beranimasi (ringan) | diukur terhadap notch kecil tetap (120 px, `NOTCH_KECIL`) |
+
+Diuji di VM: minimize (tombol & Win+↓), kembali lewat dok / daftar Jendela, maximize ↔ kembali (jendela baru → 1024×545 di tengah), ubah ukuran dari sudut (640×480 → 953×591), Pengaturan minimize → ikon dok, Win+↓/↑ saat desktop aktif tidak berbuat apa-apa.
+
+Catatan VM saja: Guest Additions 7.2.22 dipasang di VM uji (salin-tempel Windows → VM untuk mengisi kunci Gemini); tidak termasuk Atlas OS.

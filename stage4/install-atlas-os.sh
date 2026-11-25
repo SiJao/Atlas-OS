@@ -141,7 +141,11 @@ cat > "$H/.config/openbox/rc.xml" <<'EOF'
 <openbox_config xmlns="http://openbox.org/3.4/rc">
   <focus><focusNew>yes</focusNew><followMouse>no</followMouse></focus>
   <placement><policy>Smart</policy><center>yes</center></placement>
-  <theme><name>Clearlooks</name><titleLayout>LIMC</titleLayout></theme>
+  <!-- DESIGN §24.10: own dark theme; the title font sets the title-bar height, and the buttons grow with it -->
+  <theme><name>AtlasOS</name><titleLayout>LIMC</titleLayout><keepBorder>yes</keepBorder><animateIconify>no</animateIconify>
+    <font place="ActiveWindow"><name>sans</name><size>11</size><weight>bold</weight></font>
+    <font place="InactiveWindow"><name>sans</name><size>11</size><weight>normal</weight></font>
+    <font place="OnScreenDisplay"><name>sans</name><size>11</size></font></theme>
   <desktops><number>1</number></desktops>
   <margins><top>34</top><bottom>84</bottom><left>0</left><right>0</right></margins>
   <keyboard>
@@ -157,25 +161,60 @@ cat > "$H/.config/openbox/rc.xml" <<'EOF'
     <keybind key="XF86PowerOff"><action name="Execute"><command>/opt/atlas-os/atlas-key POWER</command></action></keybind>
     <keybind key="XF86MonBrightnessDown"><action name="Execute"><command>/opt/atlas-os/atlas-key BRIGHT-DOWN</command></action></keybind>
     <keybind key="A-Tab"><action name="NextWindow"/></keybind>
-    <keybind key="A-F4"><action name="Close"/></keybind>
+    <keybind key="A-F4"><action name="If"><query target="default"><name>localhost__desktop</name></query><then></then><else><action name="Close"/></else></action></keybind>
+    <!-- DESIGN §24.10: like Windows -->
+    <keybind key="W-Up"><action name="If"><query target="default"><name>localhost__desktop</name></query><then></then><else><action name="ToggleMaximize"/></else></action></keybind>
+    <keybind key="W-Down"><action name="If"><query target="default"><name>localhost__desktop</name></query><then></then><else><action name="Iconify"/></else></action></keybind>
   </keyboard>
   <mouse>
     <dragThreshold>8</dragThreshold>
-    <context name="Frame"><mousebind button="A-Left" action="Drag"><action name="Move"/></mousebind></context>
-    <context name="Titlebar"><mousebind button="Left" action="Drag"><action name="Move"/></mousebind>
+    <doubleClickTime>400</doubleClickTime>
+    <!-- Alt + left drag = move, Alt + right drag = resize, anywhere in the window -->
+    <context name="Frame">
+      <mousebind button="A-Left" action="Press"><action name="Focus"/><action name="Raise"/></mousebind>
+      <mousebind button="A-Left" action="Drag"><action name="If"><query target="default"><name>localhost__desktop</name></query><then></then><else><action name="Move"/></else></action></mousebind>
+      <mousebind button="A-Right" action="Press"><action name="Focus"/><action name="Raise"/></mousebind>
+      <mousebind button="A-Right" action="Drag"><action name="If"><query target="default"><name>localhost__desktop</name></query><then></then><else><action name="Resize"/></else></action></mousebind></context>
+    <context name="Titlebar">
+      <mousebind button="Left" action="Press"><action name="Focus"/><action name="Raise"/></mousebind>
+      <mousebind button="Left" action="Drag"><action name="Move"/></mousebind>
       <mousebind button="Left" action="DoubleClick"><action name="ToggleMaximize"/></mousebind></context>
-    <context name="Client"><mousebind button="Left" action="Press"><action name="Focus"/><action name="Raise"/></mousebind></context>
-    <context name="Close"><mousebind button="Left" action="Click"><action name="Close"/></mousebind></context>
+    <!-- edges, corners and the bottom handle: drag = resize -->
+    <context name="Top"><mousebind button="Left" action="Press"><action name="Focus"/><action name="Raise"/></mousebind><mousebind button="Left" action="Drag"><action name="Resize"/></mousebind></context>
+    <context name="Bottom"><mousebind button="Left" action="Press"><action name="Focus"/><action name="Raise"/></mousebind><mousebind button="Left" action="Drag"><action name="Resize"/></mousebind></context>
+    <context name="Left"><mousebind button="Left" action="Press"><action name="Focus"/><action name="Raise"/></mousebind><mousebind button="Left" action="Drag"><action name="Resize"/></mousebind></context>
+    <context name="Right"><mousebind button="Left" action="Press"><action name="Focus"/><action name="Raise"/></mousebind><mousebind button="Left" action="Drag"><action name="Resize"/></mousebind></context>
+    <context name="TLCorner"><mousebind button="Left" action="Press"><action name="Focus"/><action name="Raise"/></mousebind><mousebind button="Left" action="Drag"><action name="Resize"/></mousebind></context>
+    <context name="TRCorner"><mousebind button="Left" action="Press"><action name="Focus"/><action name="Raise"/></mousebind><mousebind button="Left" action="Drag"><action name="Resize"/></mousebind></context>
+    <context name="BLCorner"><mousebind button="Left" action="Press"><action name="Focus"/><action name="Raise"/></mousebind><mousebind button="Left" action="Drag"><action name="Resize"/></mousebind></context>
+    <context name="BRCorner"><mousebind button="Left" action="Press"><action name="Focus"/><action name="Raise"/></mousebind><mousebind button="Left" action="Drag"><action name="Resize"/></mousebind></context>
+    <context name="Client">
+      <mousebind button="Left" action="Press"><action name="Focus"/><action name="Raise"/></mousebind>
+      <mousebind button="Middle" action="Press"><action name="Focus"/><action name="Raise"/></mousebind>
+      <mousebind button="Right" action="Press"><action name="Focus"/><action name="Raise"/></mousebind></context>
+    <context name="Iconify">
+      <mousebind button="Left" action="Press"><action name="Focus"/><action name="Raise"/></mousebind>
+      <mousebind button="Left" action="Click"><action name="Iconify"/></mousebind></context>
+    <context name="Maximize">
+      <mousebind button="Left" action="Press"><action name="Focus"/><action name="Raise"/></mousebind>
+      <mousebind button="Left" action="Click"><action name="ToggleMaximize"/></mousebind></context>
+    <context name="Close">
+      <mousebind button="Left" action="Press"><action name="Focus"/><action name="Raise"/></mousebind>
+      <mousebind button="Left" action="Click"><action name="Close"/></mousebind></context>
     <context name="Root"></context>
   </mouse>
   <applications>
-    <application class="*"><maximized>yes</maximized></application>
+    <application class="*" type="normal"><maximized>yes</maximized>
+      <position force="no"><x>center</x><y>center</y></position><size><width>80%</width><height>80%</height></size></application>
     <application name="localhost__desktop"><maximized>no</maximized><decor>no</decor><layer>below</layer><focus>no</focus>
-      <skip_taskbar>yes</skip_taskbar><skip_pager>yes</skip_pager><position force="yes"><x>0</x><y>0</y></position></application>
+      <skip_taskbar>yes</skip_taskbar><skip_pager>yes</skip_pager><position force="yes"><x>0</x><y>0</y></position>
+      <size><width>100%</width><height>100%</height></size></application>
   </applications>
 </openbox_config>
 EOF
 install -m 755 "$HERE/files/atlas-kiosk" "$H/.local/bin/atlas-kiosk"
+install -d /usr/share/themes/AtlasOS/openbox-3   # window theme (DESIGN §24.10)
+install -m 644 "$HERE"/files/openbox-theme/AtlasOS/openbox-3/* /usr/share/themes/AtlasOS/openbox-3/
 install -d /opt/atlas-os && install -m 644 "$HERE/files/recovery-server.mjs" /opt/atlas-os/recovery-server.mjs
 install -m 644 "$HERE/files/atlas-update.mjs" /opt/atlas-os/atlas-update.mjs   # DESIGN §20
 # Mode admin (DESIGN §21): the admin = the account that ran this installer with sudo.
