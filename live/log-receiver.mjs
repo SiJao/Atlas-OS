@@ -45,7 +45,7 @@ export function modelOf(name) {
 }
 
 /** Starts both listeners; resolves to { http, udp, port, close() }. log(msg) receives one line per stored log. */
-export function startReceiver({ dir, token, port = 4960, host = '0.0.0.0', log = () => {} }) {
+export function startReceiver({ dir, token, port = 4960, host = '0.0.0.0', log = () => {}, verbose = false }) {
   const nonces = new Map();              // nonce -> expiry
   const perIp = new Map();               // ip -> timestamps of requests (rate limit)
   const limited = (ip, max) => {
@@ -57,6 +57,7 @@ export function startReceiver({ dir, token, port = 4960, host = '0.0.0.0', log =
   const srv = http.createServer((req, res) => {
     const end = (code, body, type = 'text/plain; charset=utf-8') => {
       if (res.headersSent) return;
+      if (verbose) log(`${new Date().toISOString()} ${req.socket.remoteAddress} ${req.method} ${String(req.url).split('?')[0]} -> ${code}`);
       res.writeHead(code, { 'Content-Type': type }); res.end(body);
     };
     try {
@@ -139,6 +140,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const logFile = path.join(dir, 'penerima.log');
   const log = (l) => { try { fs.appendFileSync(logFile, `${l}\n`); } catch { /* ignore */ } console.log(l); };
   process.on('uncaughtException', (e) => log(`${new Date().toISOString()} galat (penerima tetap jalan): ${e.message}`));
-  startReceiver({ dir, token, port, host, log }).then(() => log(`${new Date().toISOString()} penerima log Atlas OS Live siap di ${host}:${port} (${dir})`))
+  startReceiver({ dir, token, port, host, log, verbose: process.env.ATLAS_LOG_VERBOSE === "1" }).then(() => log(`${new Date().toISOString()} penerima log Atlas OS Live siap di ${host}:${port} (${dir})`))
     .catch((e) => { log(`${new Date().toISOString()} gagal mulai: ${e.message}`); process.exit(1); });
 }

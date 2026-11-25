@@ -1234,3 +1234,10 @@ Uji otomatis (`atlas/tests/atlas-os-live.test.mjs`): kode salah ditolak, nonce s
 - **sebelum disimpan, kunci dicek ke Google** (daftar model, kunci lewat header). Ditolak = tidak disimpan. Layanan belum aktif = diberi tahu. Offline = tetap disimpan dengan catatan "belum bisa dicek".
 
 Image live dibangun ulang dengan perbaikan ini.
+
+### 26.9 Uji boot & status (2026-11-25, dihentikan sementara)
+
+- **Lulus:** ISO di-boot di VM uji UEFI (`AtlasOS-Live-Test`, disk dengan tata letak flashdisk). Desktop Atlas tampil < 100 dtk dengan jam benar dan jaringan tersambung. Flashdisk sistem tidak ditawarkan di menu. Partisi ATLAS-LOG dibuat dan terbaca di Windows. SanDisk ditulis dan checksum hasil baca ulang cocok.
+- **Belum terbukti:** log otomatis sampai ke PC. Di VM uji tidak ada log masuk. Penyebab yang ditemukan ada di **pengaturan VM uji**, bukan di image: VM baru VirtualBox 7 punya `localhostReachable=0`, sedangkan penerima hanya mendengar di 127.0.0.1. Lanjutan: `--nat-localhostreachable1 on` di VM uji (atau penerima di 0.0.0.0 setelah aturan firewall disetujui), lalu ulangi.
+- **Perbaikan berikutnya:** menu GRUB live belum boot otomatis (tunggu Enter) → beri batas waktu 5 dtk; kompresi squashfs `zstd` supaya build lebih cepat; penerima punya `ATLAS_LOG_VERBOSE=1` untuk mencatat setiap permintaan.
+- Aturan Windows Firewall belum dibuat (menunggu UAC Hong Khai).
