@@ -1,0 +1,14 @@
+[Unit]
+Description=Atlas OS Live — log terakhir saat dimatikan (disimpan di flashdisk)
+# Stopped before NetworkManager and before file systems go away (stop order = reverse of start order).
+After=network.target NetworkManager.service local-fs.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
+ExecStop=/opt/atlas-os/atlas-live-log akhir
+TimeoutStopSec=150
+
+[Install]
+WantedBy=multi-user.target

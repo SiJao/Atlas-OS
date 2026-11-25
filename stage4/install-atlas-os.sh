@@ -13,6 +13,9 @@ ATLAS_REPO="${ATLAS_REPO:-git@github.com:SiJao/atlas.git}"
 ATLAS_REF="${ATLAS_REF:-main}"
 NODE_VERSION="${NODE_VERSION:-v24.19.0}"   # same as laptop 1
 DEPLOY_KEY=""
+# DESIGN §26: ATLAS_OS_LIVE=1 when live/build-atlas-os-live.sh runs this inside the live image's chroot
+# (no running systemd/logind, Atlas code already in /opt/atlas/current, no Claude Code).
+ATLAS_OS_LIVE="${ATLAS_OS_LIVE:-0}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
 while [ $# -gt 0 ]; do
@@ -57,6 +60,7 @@ VIDEO=(xserver-xorg-video-fbdev)
   xdotool wmctrl x11-utils pciutils xprintidle imagemagick python3 python3-gi gir1.2-atspi-2.0 at-spi2-core dbus-user-session \
   pipewire pipewire-pulse pipewire-bin wireplumber pulseaudio-utils sound-theme-freedesktop \
   network-manager polkitd brightnessctl libglib2.0-bin xdg-utils zram-tools \
+  wpasupplicant rfkill iw usbutils wireless-regdb \
   firmware-iwlwifi firmware-realtek firmware-atheros firmware-misc-nonfree \
   fonts-dejavu-core fonts-noto-core fonts-noto-color-emoji \
   google-chrome-stable libreoffice-writer libreoffice-calc libreoffice-impress libreoffice-gtk3 \
@@ -99,7 +103,8 @@ cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf <<EOF
 ExecStart=
 ExecStart=-/sbin/agetty --autologin $ATLAS_USER --noclear %I \$TERM
 EOF
-loginctl enable-linger "$ATLAS_USER"   # user services keep running between sessions
+# User services keep running between sessions. In a chroot (live build) logind is not running: write its marker file.
+loginctl enable-linger "$ATLAS_USER" 2>/dev/null || { install -d /var/lib/systemd/linger && touch "/var/lib/systemd/linger/$ATLAS_USER"; }
 
 langkah "6. Sesi layar: startx -> Openbox -> Atlas"
 # runuser keeps root's HOME and working folder otherwise (the admin's folder, which atlas may not read).
@@ -328,7 +333,9 @@ fi
 
 langkah "10. Claude Code CLI untuk $ATLAS_USER (login dilakukan Hong Khai nanti)"
 # Up to 3 tries: the one-shot download failed once in the clean VM install (2026-11-25) and worked on a plain retry.
-if [ ! -x "$H/.local/bin/claude" ]; then
+if [ "$ATLAS_OS_LIVE" = 1 ]; then
+  echo "dilewati di Atlas OS Live (DESIGN §26.2: butuh login; perubahan hilang saat mati)"
+elif [ ! -x "$H/.local/bin/claude" ]; then
   for coba in 1 2 3; do
     as_atlas bash -c 'cd ~ && curl -fsSL --retry 2 https://claude.ai/install.sh | bash' >/tmp/atlas-claude-install.log 2>&1 && break
     sleep 10
@@ -487,7 +494,7 @@ x-scheme-handler/https=google-chrome.desktop
 inode/directory=pcmanfm.desktop
 EOF
 chown -R "$ATLAS_USER:$ATLAS_USER" "$H/.config" "$H/.local" "$H/.bash_profile" "$H/.xinitrc" "$H/atlas-data"
-systemctl daemon-reload
+systemctl daemon-reload 2>/dev/null || [ "$ATLAS_OS_LIVE" = 1 ]   # no systemd running in the live build's chroot
 
 langkah "Selesai"
 echo "Mulai ulang laptop: layar langsung masuk ke Atlas (akun $ATLAS_USER)."

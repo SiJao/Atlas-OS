@@ -1,0 +1,6 @@
+[Unit]
+Description=Atlas OS Live — catat pemakaian RAM
+
+[Service]
+Type=oneshot
+ExecStart=/opt/atlas-os/atlas-live-log ram

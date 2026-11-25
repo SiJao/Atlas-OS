@@ -1,0 +1,9 @@
+[Unit]
+Description=Atlas OS Live — log 3 menit setelah menyala, lalu tiap 10 menit
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=10min
+
+[Install]
+WantedBy=timers.target

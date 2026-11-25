@@ -1,0 +1,113 @@
+#!/bin/bash
+# Atlas OS Live: automatic log (DESIGN §26.6, review §26.7). Runs as root from systemd units / the NetworkManager dispatcher.
+#   atlas-live-log kirim   take a snapshot, keep it on the stick (ATLAS-LOG), send everything not yet sent
+#   atlas-live-log akhir   same at shutdown: quick (no new hardware scan, no Wi-Fi rescan), short send budget
+#   atlas-live-log ram     append one RAM sample (every minute)
+# Never collected: Gemini key, Wi-Fi passwords, conversation text, voice, file contents.
+# Sending (and the secret code) is done by atlas-live-send.py; the code never appears on a command line.
+set -u
+export LC_ALL=C
+RUN=/run/atlas-live
+USB=$RUN/usb
+mkdir -p "$RUN" && chmod 700 "$RUN"
+
+if [ "${1:-}" = ram ]; then
+  printf '%s %s\n' "$(date +%H:%M)" "$(free -m | awk '/^Mem:/{print "terpakai="$3"MB bebas="$7"MB total="$2"MB"}')" >> "$RUN/ram.log"
+  exit 0
+fi
+MODE=${1:-kirim}
+TUNGGU=120; [ "$MODE" = akhir ] && TUNGGU=15
+exec 9>"$RUN/lock"; flock -w "$TUNGGU" 9 || exit 0   # one run at a time
+
+# ---------- where to keep snapshots: the ATLAS-LOG partition (tested writable), else RAM ----------
+bisa_tulis() { touch "$1/.uji-tulis" 2>/dev/null && rm -f "$1/.uji-tulis"; }
+simpan_di() {
+  if mountpoint -q "$USB" && ! bisa_tulis "$USB"; then umount -l "$USB" 2>/dev/null || true; fi   # stick pulled / I/O error
+  if ! mountpoint -q "$USB"; then
+    local dev; dev=$(blkid -L ATLAS-LOG 2>/dev/null || true)
+    if [ -n "$dev" ]; then mkdir -p "$USB" && mount -o rw,noatime,flush,umask=077 "$dev" "$USB" 2>/dev/null || true; fi
+  fi
+  if mountpoint -q "$USB" && mkdir -p "$USB/atlas-live-log" 2>/dev/null && bisa_tulis "$USB/atlas-live-log"; then
+    echo "$USB/atlas-live-log"
+  else echo "$RUN/simpan"; fi
+}
+DIR=$(simpan_di)
+mkdir -p "$DIR/belum-terkirim" "$DIR/terkirim"
+
+# ---------- snapshot ----------
+model=$(cat /sys/class/dmi/id/sys_vendor /sys/class/dmi/id/product_name 2>/dev/null | tr -s ' \n' '-' | tr -cd 'A-Za-z0-9._-' | cut -c1-40)
+model=${model%-}; model=${model:-laptop}
+boot=$(cut -c1-8 /proc/sys/kernel/random/boot_id)
+NAME="$model-$boot-$(date +%Y%m%d-%H%M%S)"
+T=$(mktemp -d "$RUN/potret.XXXX"); trap 'rm -rf "$T"' EXIT
+S="$T/$NAME"; mkdir -p "$S"
+mask() { sed -E 's/(([0-9a-fA-F]{2}:){3})([0-9a-fA-F]{2}:){2}[0-9a-fA-F]{2}/\1xx:xx:xx/g'; }
+# Files under /home/atlas belong to the unprivileged account: read them AS that account, with a time limit
+# (a symlink or FIFO placed there must not make root read another file or hang; review §26.7 no. 4).
+sbg_atlas() { runuser -u atlas -- timeout 10 "$@" 2>/dev/null; }
+
+{
+  echo "Atlas OS Live — log $(date '+%Y-%m-%d %H:%M:%S %Z') ($MODE)"
+  echo "laptop: $(cat /sys/class/dmi/id/sys_vendor /sys/class/dmi/id/product_name /sys/class/dmi/id/product_version 2>/dev/null | tr '\n' ' ')"
+  echo "atlas: $(basename "$(readlink -f /opt/atlas/current)")  kernel: $(uname -r)  menyala: $(uptime -p)"
+  echo "boot: $boot  cpu: $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2-)  ram: $(free -m | awk '/^Mem:/{print $2" MB"}')"
+} > "$S/info.txt"
+
+# Hardware inventory (stage 6, read-only): once per boot (too slow for shutdown).
+if [ ! -s "$RUN/hardware.txt" ] && [ "$MODE" != akhir ]; then
+  H=$(mktemp -d "$RUN/inv.XXXX")
+  (cd "$H" && timeout 180 bash /opt/atlas-os/hardware-inventory.sh >/dev/null 2>&1)
+  f=$(ls "$H"/atlas-hardware-*.txt 2>/dev/null | head -1); [ -n "$f" ] && mv "$f" "$RUN/hardware.txt"; rm -rf "$H"
+fi
+cp "$RUN/hardware.txt" "$S/hardware.txt" 2>/dev/null || echo "(inventaris belum selesai)" > "$S/hardware.txt"
+
+RESCAN=auto; [ "$MODE" = akhir ] && RESCAN=no
+{
+  echo "===== kartu jaringan (lspci -k)"; lspci -nnk 2>/dev/null | grep -A3 -iE 'network|wireless|wi-fi|ethernet' | mask
+  echo; echo "===== USB Wi-Fi (lsusb)"; lsusb 2>/dev/null | grep -iE 'wireless|wlan|802\.11|wi-?fi|realtek|ralink|mediatek|atheros' || echo "(tidak ada)"
+  echo; echo "===== rfkill"; rfkill list 2>&1
+  echo; echo "===== wpa_supplicant"; systemctl is-active wpa_supplicant 2>&1; command -v wpa_supplicant >/dev/null || echo "TIDAK TERPASANG"
+  echo; echo "===== NetworkManager radio"; nmcli -t radio 2>&1
+  echo; echo "===== perangkat"; nmcli -t -f DEVICE,TYPE,STATE,CONNECTION device 2>&1
+  echo; echo "===== jaringan Wi-Fi terlihat (nama:sinyal:keamanan)"
+  timeout 20 nmcli -t -f SSID,SIGNAL,SECURITY device wifi list --rescan "$RESCAN" 2>&1 | head -40
+  echo; echo "===== sambungan aktif"; nmcli -t -f NAME,TYPE,DEVICE connection show --active 2>&1
+  echo; echo "===== internet"; timeout 10 nmcli networking connectivity check 2>&1
+  echo; echo "===== firmware & driver Wi-Fi (log kernel)"
+  journalctl -k -b --no-pager 2>/dev/null | grep -iE 'firmware|iwlwifi|rtw|rtl8|ath9k|ath10k|ath11k|mt7|brcm|wlan|wlp' | mask | tail -60
+} > "$S/wifi.txt" 2>&1
+
+{
+  echo "===== layanan gagal"; systemctl --failed --no-legend --no-pager 2>&1
+  echo; echo "===== peringatan & galat sejak menyala"; journalctl -b -p warning --no-pager 2>/dev/null | mask | tail -400
+} > "$S/galat.txt"
+
+X=/home/atlas/.local/share/xorg/Xorg.0.log
+{ sbg_atlas head -30 "$X" || echo "(Xorg.0.log tidak terbaca)"; echo '...'; sbg_atlas grep -E '\((EE|WW)\)' "$X" | tail -80; } > "$S/xorg.txt"
+journalctl -b "_UID=$(id -u atlas 2>/dev/null || echo 1000)" -p err --no-pager 2>/dev/null | tail -200 > "$S/atlas.txt"
+
+{
+  echo "===== waktu boot"; systemd-analyze 2>&1 | head -3; systemd-analyze blame --no-pager 2>/dev/null | head -15
+  echo; echo "===== aksi Atlas (alat | label | status | waktu) — tanpa isi percakapan"
+  sbg_atlas python3 -c '
+import glob, json
+rows = []
+for f in sorted(glob.glob("/home/atlas/atlas-data/audit/*.jsonl")):
+    try:
+        with open(f, encoding="utf-8", errors="replace") as h:
+            for line in h:
+                try: a = json.loads(line)
+                except Exception: continue
+                if isinstance(a, dict): rows.append(" | ".join(str(a.get(k, ""))[:80] for k in ("alat", "label", "status", "waktu")))
+    except OSError: pass
+print("\n".join(rows[-300:]))'
+  echo; echo "===== RAM per menit"; tail -600 "$RUN/ram.log" 2>/dev/null
+} > "$S/pemakaian.txt"
+
+tar -C "$T" -czf "$DIR/belum-terkirim/$NAME.tar.gz" "$NAME" 2>/dev/null || rm -f "$DIR/belum-terkirim/$NAME.tar.gz"
+sync
+
+# ---------- send everything not yet sent (at shutdown: short budget, never wait for "full" internet) ----------
+BUDGET=480; [ "$MODE" = akhir ] && BUDGET=40
+timeout "$((BUDGET + 20))" /usr/bin/python3 /opt/atlas-os/atlas-live-send.py "$DIR" "$BUDGET" || true
+sync

@@ -1,0 +1,6 @@
+#!/bin/sh
+# Atlas OS Live (DESIGN §26.6): a network came up -> send waiting logs now (not wait for the 10-minute timer).
+case "$2" in
+  up|connectivity-change) systemctl start --no-block atlas-live-log.service ;;
+esac
+exit 0

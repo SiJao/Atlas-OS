@@ -8,3 +8,6 @@ stage4/files/admin-terminal.py text eol=lf
 stage4/files/atlas-lock text eol=lf
 stage4/files/atlas-key text eol=lf
 stage4/files/openbox-theme/** text eol=lf
+live/files/** text eol=lf
+live/*.sh text eol=lf
+live/*.mjs text eol=lf

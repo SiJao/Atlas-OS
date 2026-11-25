@@ -1,0 +1,10 @@
+[Unit]
+Description=Atlas OS Live — log ke PC / flashdisk (DESIGN §26.6)
+After=network-online.target NetworkManager.service local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/atlas-os/atlas-live-log kirim
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=6min

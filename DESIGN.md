@@ -1116,3 +1116,109 @@ Pemeriksaan independen (2 pemeriksa + verifikasi skeptis per temuan): **8 temuan
 Diuji di VM: minimize (tombol & Win+↓), kembali lewat dok / daftar Jendela, maximize ↔ kembali (jendela baru → 1024×545 di tengah), ubah ukuran dari sudut (640×480 → 953×591), Pengaturan minimize → ikon dok, Win+↓/↑ saat desktop aktif tidak berbuat apa-apa.
 
 Catatan VM saja: Guest Additions 7.2.22 dipasang di VM uji (salin-tempel Windows → VM untuk mengisi kunci Gemini); tidak termasuk Atlas OS.
+
+## 26. Atlas OS Live — flashdisk untuk mencoba di laptop lain (2026-11-25)
+
+**Permintaan Hong Khai:** "format flashdisk, lalu pasang file live boot ke flashdisk, saya akan mencoba ke laptop lain". Pilihannya (2026-11-25): **Atlas OS Live** (bukan Debian Live biasa, bukan flashdisk pemasang), ditulis ke **SanDisk 8 GB ATLAS-UJI**.
+
+### 26.1 Bentuk
+
+- Satu berkas ISO hibrida (`atlas-os-live-amd64.iso`, ± 3 GB) yang boot dari flashdisk di laptop **UEFI maupun BIOS lama**. Atlas OS langsung jalan dari flashdisk; **disk laptop tidak disentuh**.
+- Tanpa persistensi: semua perubahan (berkas, setelan, kunci Gemini yang diisi) **hilang saat dimatikan**. Ini memang untuk mencoba.
+- Isi = hasil `install-atlas-os.sh` yang sama (satu sumber kebenaran), termasuk firmware Wi-Fi (Intel, Realtek, Atheros, lain-lain) supaya Wi-Fi laptop lain terbaca.
+- Kode Atlas = `git archive` dari komit Atlas yang sedang dipakai (tanpa `.git`).
+
+### 26.2 Yang sengaja TIDAK ada di ISO
+
+| Tidak ada | Alasan |
+|---|---|
+| Kunci Gemini, berkas rahasia, data Atlas Hong Khai | ISO bisa terbawa/hilang; kunci diisi di Pengaturan › Atlas saat mencoba (salin-tempel dari browser Atlas OS) |
+| Deploy key SiJao/atlas, kunci/sandi VM (`vm/`) | rahasia; pembaruan Atlas tidak diperlukan di live (perubahan hilang saat mati) |
+| Claude Code | butuh login (rahasia di RAM); ukuran ± 200 MB |
+| Akun admin | live tanpa sandi admin = Mode admin mati; `atlas` tetap tanpa hak admin |
+| `live-config` (pembuat akun "user" berhak admin) | dibuang; akun `atlas` dibuat oleh pemasang seperti biasa |
+| Pembaruan otomatis (apt, cek versi Atlas) | dimatikan: menulis ke RAM untuk sesuatu yang hilang saat mati |
+
+Catatan: ISO berisi kode Atlas dari repo **privat** SiJao/atlas. Flashdisk ini milik Hong Khai; jangan dibagikan ke orang lain.
+
+### 26.3 Cara membuat (`live/build-atlas-os-live.sh`, dijalankan di VM uji sebagai root)
+
+1. `live-build` (Debian 13): `--distribution trixie --archive-areas "main contrib non-free-firmware" --binary-images iso-hybrid --bootloaders "grub-efi,syslinux" --debian-installer none`, nama volume `ATLAS_OS_LIVE`, zona waktu Asia/Jakarta, nama mesin `atlas-live`.
+2. `includes.chroot`: `stage4/` sementara di `/root/atlas-os-stage4`, kode Atlas di `/opt/atlas/releases/<komit>` + `current`.
+3. Hook chroot: `ATLAS_OS_LIVE=1 ./install-atlas-os.sh` → buang `live-config`, matikan timer pembaruan, hapus `stage4/` dan cache apt.
+4. Penyesuaian pemasang untuk chroot (tetap sama untuk laptop biasa): `enable-linger` lewat berkas bila `loginctl` tidak bisa; `daemon-reload` terakhir boleh gagal; langkah Claude dilewati bila `ATLAS_OS_LIVE=1`.
+
+### 26.4 Uji sebelum dipakai
+
+1. ISO di-boot di VM VirtualBox baru (EFI) → harus sampai ke desktop Atlas tanpa campur tangan.
+2. Baru ditulis ke flashdisk dari dalam VM uji (`dd`) **setelah** memastikan `/dev/sdX` adalah SanDisk bernomor seri `4C530001250512110243`; dibaca ulang dan dibandingkan checksum.
+
+### 26.5 Risiko yang diketahui
+
+- **Secure Boot:** bila laptop menolak boot, matikan Secure Boot di BIOS (bootloader bertanda tangan belum dijamin pada build ini).
+- RAM laptop < 4 GB: live memakai RAM untuk semua perubahan; bisa lambat.
+- Driver grafis/Wi-Fi yang tidak ada di Debian 13 tetap tidak jalan (justru ini gunanya mencoba).
+- Mode admin & Ctrl+Alt+F2 tidak bisa dipakai (tidak ada akun admin di live).
+
+### 26.6 Log otomatis ke PC Hong Khai + uji Wi-Fi (keputusan Hong Khai 2026-11-25)
+
+Permintaan: "pasang auto log yang langsung mengirim ke laptop ini saat ada jaringan, namun jika tidak ada jaringan, simpan di flashdisk. cek fungsi wifi juga". Pilihan: **langsung lewat LAN/Wi-Fi** ke PC Windows (DESKTOP-ATLAS); isi log: **perangkat keras + uji Wi-Fi, galat sistem, pemakaian**.
+
+**Di flashdisk:** setelah ISO ditulis, sisa ruang menjadi partisi FAT32 **`ATLAS-LOG`**. Isinya: `atlas-live-log/belum-terkirim/` dan `atlas-live-log/terkirim/`. Flashdisk ini bisa dibaca langsung di Windows.
+
+**Di Atlas OS Live (root, `/opt/atlas-os/atlas-live-log`):**
+
+| Kapan | Apa |
+|---|---|
+| 3 menit setelah menyala, lalu tiap 10 menit | ambil potret log → simpan di `belum-terkirim/` → coba kirim semua yang belum terkirim |
+| jaringan tersambung (NetworkManager dispatcher) | langsung coba kirim |
+| tiap menit | catat pemakaian RAM |
+| saat dimatikan | potret terakhir (kalau jaringan sudah putus: tetap di flashdisk, dikirim saat menyala berikutnya) |
+
+PC dicari berurutan: alamat yang terakhir berhasil, alamat yang dimasukkan saat membuat ISO (IP LAN PC + `DESKTOP-ATLAS.local`), lalu siaran UDP di jaringan lokal (port 4960) yang dijawab penerima. Setiap kiriman membawa **kode rahasia flashdisk** (32 byte acak, dibuat saat build). Kode itu **tidak** masuk repo publik: ada di ISO (`/etc/atlas-os/live-log.token`, root 0600) dan di PC (`C:\HISADA\atlas-live-logs\receiver.json`). Pengiriman memakai HTTP biasa di LAN. Isi log bukan rahasia; kode itu hanya membuka izin menaruh log.
+
+**Isi satu potret (`.tar.gz`, nama `<merk-model>-<boot>-<jam>`):**
+- `info.txt`: waktu, merk/model laptop, versi Atlas, kernel, lama menyala.
+- `hardware.txt`: `hardware-inventory.sh` Tahap 6 (baca-saja; MAC & nomor seri disamarkan).
+- `wifi.txt`:
+  - kartu Wi-Fi & driver (`lspci -k`), `rfkill`, status NetworkManager;
+  - daftar jaringan terlihat (nama + sinyal), tersambung/tidak, cek internet;
+  - pesan firmware dari log kernel.
+- `galat.txt`: peringatan/galat journal sejak menyala, layanan yang gagal.
+- `xorg.txt`: baris galat/peringatan Xorg.
+- `atlas.txt`: galat server Atlas.
+- `pemakaian.txt`: daftar aksi Atlas (alat, label ≤ 80 huruf, status, waktu; **tanpa isi percakapan**), waktu boot (`systemd-analyze`), RAM per menit.
+
+**Tidak pernah dikirim:** kunci Gemini, sandi Wi-Fi, isi percakapan/suara, isi berkas.
+
+**Di PC (DESKTOP-ATLAS)** — protokol diperbarui di §26.7 (kode tidak pernah dikirim; log tidak dibuka otomatis):
+- `live/log-receiver.mjs` (Node) mendengar di port 4960 (TCP untuk log, UDP untuk pencarian).
+- Hanya menerima kiriman yang membawa kode yang benar; ukuran maksimal 20 MB.
+- Log disimpan di `C:\HISADA\atlas-live-logs\<model>\` dan langsung dibuka (`tar`).
+- Dijalankan otomatis saat login (folder Startup, tanpa jendela).
+- Aturan Windows Firewall masuk TCP+UDP 4960, **hanya dari subnet lokal**. Jaringan pondok berprofil *Public*, jadi aturan berlaku untuk Public+Private. Pembuatannya perlu persetujuan UAC Hong Khai.
+
+**Pengaman tambahan (ditemukan saat merancang):** di live, flashdisk boot sendiri tergolong "removable". Atlas akan menampilkannya di menu flashdisk, dan "Lepas dengan aman" mematikan sistem yang sedang berjalan. Maka Atlas **tidak pernah menampilkan disk yang menampung `/`, `/boot`, `/boot/efi` atau `/run/live/medium`** (berlaku juga untuk laptop biasa).
+
+**Uji Wi-Fi:** VM tidak punya kartu Wi-Fi. Fungsi Wi-Fi diuji di laptop sungguhan lewat `wifi.txt` (kartu terdeteksi? firmware termuat? jaringan terlihat? tersambung? internet?) dan panel Jaringan Atlas.
+
+### 26.7 Pemeriksaan independen Atlas OS Live (2026-11-25)
+
+3 pemeriksa (keamanan & privasi, keandalan, live-build) + pemeriksa skeptis per temuan: **16 temuan, 11 terbukti, 5 terbantah.** Build pertama dihentikan (cache disimpan) dan dibangun ulang dengan perbaikan.
+
+| No | Temuan (tingkat) | Perbaikan |
+|---|---|---|
+| 1 | Penerima menjalankan `tar` dengan folder kerja berisi isi arsip kiriman → `tar.exe` palsu bisa dijalankan di PC (berat) | penerima **tidak membuka apa pun**: log disimpan apa adanya (`.tar.gz`, dibuka lewat Explorer) |
+| 2 | Kode terbaca akun atlas lewat baris perintah `curl` milik root (berat) | `curl` dibuang; pengirim Python membaca kode dari berkas root 0600, kode tidak pernah ada di baris perintah |
+| 3 | Kode dikirim ke perangkat mana pun yang menjawab siaran UDP, lewat HTTP polos (berat → sedang) | **kode tidak pernah dikirim**: PC harus membuktikan tahu kode (HMAC atas nonce acak, UDP & `/hai`); tiap unggahan ditandatangani HMAC atas nonce sekali-pakai + nama + sha256 isi |
+| 4 | Root membaca berkas milik atlas (Xorg log, audit) → symlink/FIFO bisa membuat root membaca berkas lain atau macet (sedang) | dibaca **sebagai atlas** (`runuser`) dengan batas waktu 10 dtk; baris audit bukan objek diabaikan |
+| 5/9 | Penerima mati oleh permintaan aneh (`GET //`), nama perangkat Windows (`CON-…`), atau galat simpan (sedang) | semua jalur dibungkus, `clientError` ditangani, nama CON/NUL/AUX/COMx/LPTx & titik di akhir ditolak, berkas yang sudah ada tidak ditimpa |
+| 6 | Log akhir saat dimatikan bisa terpotong (inventaris 180 dtk + antre 120 dtk > batas 90 dtk) (berat) | mode akhir: tanpa inventaris baru, tanpa pindai ulang Wi-Fi, antre 15 dtk, kirim 40 dtk; batas unit 150 dtk |
+| 7 | Log akhir tidak dikirim bila internet tidak "full", padahal PC ada di LAN (sedang) | syarat internet dibuang; cukup cari PC |
+| 8 | Flashdisk dicabut/galat I/O → potret hilang, folder sementara menumpuk (sedang) | uji tulis; mount basi dilepas → simpan di RAM; folder sementara selalu dihapus (`trap`) |
+| 10 | Pemeriksaan "Atlas terpasang" selalu gagal (symlink mutlak di squashfs) (sedang) | cek folder rilis + isi `readlink` |
+| 11 | Pesan "Build gagal" tidak pernah muncul (`pipefail`) (ringan) | `\|\| true` |
+
+Tambahan dari pemeriksaan (ditolak sebagai "tidak terbukti dari kode", tetapi dicek langsung): pemasang memakai `--no-install-recommends`, sehingga `wpasupplicant` (hanya *Recommends* dari NetworkManager) bisa tidak ikut; tanpa itu **Wi-Fi tidak bisa tersambung sama sekali**. Di VM kebetulan ada, `rfkill` tidak ada. Pemasang kini memasang `wpasupplicant rfkill iw usbutils wireless-regdb` secara eksplisit (laptop biasa juga), dan build memeriksanya.
+
+Uji otomatis (`atlas/tests/atlas-os-live.test.mjs`): kode salah ditolak, nonce sekali pakai, tidak ada yang dibuka, permintaan aneh tidak mematikan penerima, balasan UDP berupa HMAC, dan pengirim Python sungguhan ↔ penerima Node sungguhan (penerima palsu yang tidak tahu kode tidak mendapat apa-apa).
