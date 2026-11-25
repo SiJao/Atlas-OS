@@ -288,11 +288,25 @@ EOF
 fi
 
 langkah "10. Claude Code CLI untuk $ATLAS_USER (login dilakukan Hong Khai nanti)"
-if [ ! -x "$H/.local/bin/claude" ]; then as_atlas bash -c 'cd ~ && curl -fsSL https://claude.ai/install.sh | bash' >/dev/null 2>&1 || echo "PERINGATAN: Claude Code belum terpasang (coba lagi nanti)."; fi
+# Up to 3 tries: the one-shot download failed once in the clean VM install (2026-11-25) and worked on a plain retry.
+if [ ! -x "$H/.local/bin/claude" ]; then
+  for coba in 1 2 3; do
+    as_atlas bash -c 'cd ~ && curl -fsSL --retry 2 https://claude.ai/install.sh | bash' >/tmp/atlas-claude-install.log 2>&1 && break
+    sleep 10
+  done
+  [ -x "$H/.local/bin/claude" ] || { echo "PERINGATAN: Claude Code belum terpasang (coba lagi nanti). Pesan terakhir:"; tail -3 /tmp/atlas-claude-install.log; }
+fi
 [ -x "$H/.local/bin/claude" ] && echo "claude: $(as_atlas "$H/.local/bin/claude" --version 2>/dev/null | head -1)"
 
 langkah "11. Sistem: zram 50 %, boot cepat"
 printf 'ALGO=zstd\nPERCENT=50\n' > /etc/default/zramswap
+# Atlas OS never offers ssh over AF_VSOCK; the generator only printed "Failed to query local AF_VSOCK CID" errors over
+# the console on every package install (clean VM install, 2026-11-25). Console shows only crit and worse.
+install -d /etc/systemd/system-generators
+ln -sf /dev/null /etc/systemd/system-generators/systemd-ssh-generator
+printf 'kernel.printk = 3 4 1 3\n' > /etc/sysctl.d/20-atlas-os-quiet-console.conf
+sysctl -q -p /etc/sysctl.d/20-atlas-os-quiet-console.conf || true
+systemctl daemon-reload || true
 systemctl enable --now zramswap >/dev/null 2>&1 || true
 if grep -q '^GRUB_TIMEOUT=' /etc/default/grub; then sed -i 's/^GRUB_TIMEOUT=.*/GRUB_TIMEOUT=1/' /etc/default/grub && update-grub >/dev/null 2>&1 || true; fi
 systemctl enable NetworkManager >/dev/null 2>&1 || true

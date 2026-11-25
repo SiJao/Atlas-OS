@@ -1059,3 +1059,31 @@ Plugin `atlas-os-engineering`, mode ultracode: 4 pemeriksa (keamanan, adaptor Li
 | 17 | Tombol daya diabaikan → tidak ada jalan mematikan bila Atlas/layar kunci macet (ringan) | tahan tombol daya ± 2 dtk = mati paksa (`HandlePowerKeyLongPress`) |
 
 Catatan: no. 10 (hard disk USB terdaftar tetapi gagal di-mount karena aturan polkit `drive.removable`) **belum diubah**: udisks menganggap drive USB "removable" walau medianya tetap; dicek di uji perangkat keras (VM tidak punya USB).
+
+### 24.9 Uji VM bersih: pemasang & flashdisk (2026-11-25)
+
+VM `AtlasOS-Install` dipasang ulang dari nol (Debian 13 netinst + `install-atlas-os.sh`), lalu kode Atlas §24 ditimpakan dan diuji di layar VM (klik sungguhan lewat `xdotool`, tangkapan layar VirtualBox). Flashdisk uji: SanDisk Cruzer Switch 8 GB, diformat FAT32 `ATLAS-UJI` atas izin Hong Khai (isi lamanya dicadangkan dulu ke PC dan dicek hash per file), disambungkan ke VM lewat pengendali USB 3 + filter USB.
+
+| Yang diuji | Hasil |
+|---|---|
+| Flashdisk dicolok → terpasang otomatis di `/media/atlas/ATLAS-UJI`, notch "Flashdisk tersambung" | lulus (± 1 dtk) |
+| Menu flashdisk di bar: Buka (pengelola berkas berbahasa Indonesia di folder flashdisk), Lepas dengan aman (flashdisk dimatikan, ikon hilang) | lulus |
+| Pengaturan › Penyimpanan: "Jadikan … tempat cadangan" → cadangan pertama langsung berjalan; "Cadangkan sekarang" menyalin berkas baru | lulus (`Cadangan Atlas OS/Documents/…` di flashdisk) |
+| Dicolok ulang dalam 7 hari → tidak dicadangkan lagi | lulus |
+
+Ditemukan & diperbaiki:
+
+| No | Temuan | Perbaikan |
+|---|---|---|
+| 1 | Pada lebar 1280 px CSS (VM, dan laptop 11,6" FHD pada skala 1,5) kelompok kanan bar masuk ke bawah notch: ikon flashdisk & indikator EN/AR **tertutup** | `rapikanBar()`: bila menabrak notch, sembunyikan dulu angka RAM (ada di Pengaturan › Sistem), lalu tulisan "Online · Kabel" (titiknya tetap); dicek ulang saat flashdisk/papan ketik/tombol versi baru berubah dan saat ukuran jendela berubah |
+| 2 | Pengaturan › Penyimpanan tetap "belum pernah" setelah cadangan otomatis selesai | acara SSE `cadangan` (mulai/selesai, juga saat gagal) + `drive`: halaman Penyimpanan membaca ulang dirinya (tidak saat ada isian yang sedang diketik) |
+| 3 | Tepat setelah Atlas mulai ulang, Penyimpanan menulis "Tidak ada flashdisk tersambung" padahal flashdisk terpasang (pemantau 3 dtk belum jalan) | `daftarDrive()` memindai sekali bila pemantau belum pernah jalan; halaman Pengaturan hanya menggambar jawaban terbaru (jawaban lama yang lambat tidak menimpa) |
+| 4 | Cadangan dari tombol tercatat "dari otomatis" di daftar aktivitas | sumber dicatat sesuai asal (`tombol` / `otomatis`) |
+| 5 | Pemasang: Claude Code gagal terpasang sekali (unduhan), pesan galat dibuang | dicoba 3 kali, 3 baris terakhir galat ditampilkan bila tetap gagal |
+| 6 | Layar tty1 penuh pesan merah `systemd-ssh-generator: Failed to query local AF_VSOCK CID` setiap paket dipasang | generator itu dimatikan (`/etc/systemd/system-generators/…` → `/dev/null`; Atlas OS tidak memakai ssh lewat vsock) + `kernel.printk = 3 4 1 3` (konsol hanya pesan kritis) |
+
+Catatan:
+- Perintah pasca-pasang VirtualBox (`--post-install-command`) tidak memasang kunci ssh VM; kunci dipasang sekali lewat sandi VM. Hanya urusan VM uji, bukan pemasang Atlas OS.
+- Daftar aktivitas Keamanan memakai nama kunci mentah (`pengaturan: jadikanCadangan`, `bukaDrive`); belum diubah (kecil).
+- Daftar penyiapan pertama muncul lagi setiap Atlas dimulai ulang sampai "Selesai" ditekan (sesuai rancangan: "Nanti" = tanya lagi).
+- Masih harus diuji di VM: kunci layar PIN, skala tampilan, proyektor/mode layar, papan ketik Arab, notifikasi, peluncur, printer (cups-pdf), Bluetooth (VM tanpa Bluetooth), katalog aplikasi, tombol Fn/PrintScreen.
