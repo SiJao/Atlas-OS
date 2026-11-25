@@ -1222,3 +1222,15 @@ PC dicari berurutan: alamat yang terakhir berhasil, alamat yang dimasukkan saat 
 Tambahan dari pemeriksaan (ditolak sebagai "tidak terbukti dari kode", tetapi dicek langsung): pemasang memakai `--no-install-recommends`, sehingga `wpasupplicant` (hanya *Recommends* dari NetworkManager) bisa tidak ikut; tanpa itu **Wi-Fi tidak bisa tersambung sama sekali**. Di VM kebetulan ada, `rfkill` tidak ada. Pemasang kini memasang `wpasupplicant rfkill iw usbutils wireless-regdb` secara eksplisit (laptop biasa juga), dan build memeriksanya.
 
 Uji otomatis (`atlas/tests/atlas-os-live.test.mjs`): kode salah ditolak, nonce sekali pakai, tidak ada yang dibuka, permintaan aneh tidak mematikan penerima, balasan UDP berupa HMAC, dan pengirim Python sungguhan ↔ penerima Node sungguhan (penerima palsu yang tidak tahu kode tidak mendapat apa-apa).
+
+### 26.8 Kunci Gemini format baru ditolak (uji VM 2026-11-25)
+
+**Masalah:** Pengaturan › Atlas menolak setiap kunci dengan "Bentuk kunci tidak dikenali". Kunci Gemini sekarang berbentuk **`AQ.…`** (ada titik, lebih dari 39 karakter), padahal pemeriksaan hanya mengizinkan huruf, angka, `-` dan `_` (bentuk lama `AIza…`). Salin-tempel ke VM baru bisa setelah Guest Additions dipasang.
+
+**Perbaikan (`atlas/server/gemini-key.js`):**
+- kedua bentuk diterima;
+- yang sering ikut tersalin dibuang otomatis: spasi/baris baru, tanda kutip, `GEMINI_API_KEY=`, karakter tak terlihat;
+- bila masih salah, Atlas menjelaskan sebabnya **tanpa memperlihatkan kunci** (terlalu pendek N karakter, berisi titik dua, alamat web, dll.);
+- **sebelum disimpan, kunci dicek ke Google** (daftar model, kunci lewat header). Ditolak = tidak disimpan. Layanan belum aktif = diberi tahu. Offline = tetap disimpan dengan catatan "belum bisa dicek".
+
+Image live dibangun ulang dengan perbaikan ini.
