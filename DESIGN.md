@@ -1242,3 +1242,4 @@ Image live dibangun ulang dengan perbaikan ini.
 - **Perbaikan berikutnya:** menu GRUB live belum boot otomatis (tunggu Enter) → beri batas waktu 5 dtk; kompresi squashfs `zstd` supaya build lebih cepat; penerima punya `ATLAS_LOG_VERBOSE=1` untuk mencatat setiap permintaan.
 - Aturan Windows Firewall belum dibuat (menunggu UAC Hong Khai).
 - **Pembaruan (malam yang sama): log ke PC TERBUKTI.** Aturan Windows Firewall dibuat (UAC disetujui Hong Khai, hanya subnet lokal) dan penerima mendengar di 0.0.0.0. VM uji mengirim 6 log lewat alamat LAN PC: 5 log yang menumpuk di ATLAS-LOG terkirim begitu penerima terjangkau, 1 log baru dikirim oleh dispatcher NetworkManager saat jaringan tersambung. Semua tanda tangan sah, isi lengkap.
+- **Keputusan Hong Khai (2026-11-25):** cadangan lewat Cloudflare **tidak** dibuat; jalur LAN pondok + simpan di ATLAS-LOG sudah cukup.
